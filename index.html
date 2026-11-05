@@ -11,15 +11,17 @@ header{background:#245b38;color:white;padding:22px;text-align:center}
 main{max-width:760px;margin:20px auto;padding:12px}
 .card{background:white;padding:20px;border-radius:12px;margin-bottom:16px;box-shadow:0 2px 10px #0001}
 h2{color:#245b38}
-input,select,button{box-sizing:border-box;width:100%;padding:12px;margin:6px 0;border-radius:7px;font-size:16px}
-input,select{border:1px solid #ccc;background:white}
+input,select,button,textarea{box-sizing:border-box;width:100%;padding:12px;margin:6px 0;border-radius:7px;font-size:16px}
+input,select,textarea{border:1px solid #ccc;background:white}
+textarea{min-height:75px;font-family:Arial}
 button{border:0;background:#287345;color:white;font-weight:bold;cursor:pointer}
 .secondary{background:#65756a}
 .delete{background:#a83232}
 .hidden{display:none}
 .animal,.entry,.exhibition{border:1px solid #ddd;padding:12px;border-radius:8px;margin:10px 0}
 #sprava{padding:10px;color:#245b38;overflow-wrap:anywhere}
-label{display:block;margin-top:8px}
+label{display:block;margin-top:8px;font-weight:bold}
+.result{background:#edf5ee;padding:12px;border-radius:8px;margin-top:10px}
 </style>
 </head>
 <body>
@@ -102,7 +104,7 @@ label{display:block;margin-top:8px}
 </div>
 
 <div class="card">
-<h2>Moje prihlášky</h2>
+<h2>Moje prihlášky a hodnotenia</h2>
 <div id="mojePrihlasky">Načítavam prihlášky...</div>
 </div>
 
@@ -432,12 +434,49 @@ async function nacitajMojePrihlasky(){
   return;
  }
 
+ const entryIds=moje.map(e=>e.id);
+ const {data:hodnotenia,error:hodError}=await db.from('judging')
+ .select('id,entry_id,points,award,notes')
+ .in('entry_id',entryIds);
+
+ if(hodError){
+  box.textContent='Chyba pri načítaní hodnotení: '+hodError.message;
+  return;
+ }
+
  moje.forEach(e=>{
   const v=vystavy.find(x=>x.id===e.exhibition_id);
   const z=mojeZvierata.find(x=>x.id===e.animal_id);
+  const h=(hodnotenia||[]).find(x=>x.entry_id===e.id);
+
   const d=document.createElement('div');
   d.className='entry';
-  d.textContent=(v?.name||'Výstava')+' — '+(z?.category||'Zviera')+' '+(z?.breed||'')+' — klietka: '+(e.cage_number||'zatiaľ nepridelená')+' — stav: '+(e.entry_status||'prijatá');
+
+  const title=document.createElement('strong');
+  title.textContent=(v?.name||'Výstava');
+  d.appendChild(title);
+
+  const p=document.createElement('p');
+  p.textContent=(z?.category||'Zviera')+' — '+(z?.breed||'')+' — klietka: '+(e.cage_number||'zatiaľ nepridelená')+' — stav: '+(e.entry_status||'prijatá');
+  d.appendChild(p);
+
+  const result=document.createElement('div');
+  result.className='result';
+
+  const heading=document.createElement('strong');
+  heading.textContent='Hodnotenie zvieraťa';
+  result.appendChild(heading);
+
+  const details=document.createElement('p');
+
+  if(h){
+   details.textContent='Body: '+(h.points??'—')+' | Ocenenie: '+(h.award||'bez ocenenia')+' | Poznámka: '+(h.notes||'bez poznámky');
+  }else{
+   details.textContent='Hodnotenie zatiaľ nebolo zadané.';
+  }
+
+  result.appendChild(details);
+  d.appendChild(result);
   box.appendChild(d);
  });
 }
@@ -501,9 +540,21 @@ async function nacitajVsetkyPrihlasky(){
   return;
  }
 
+ const entryIds=entries.map(e=>e.id);
+ const {data:hodnotenia,error:hodError}=await db.from('judging')
+ .select('id,entry_id,points,award,notes')
+ .in('entry_id',entryIds);
+
+ if(hodError){
+  box.textContent='Chyba pri načítaní hodnotení: '+hodError.message;
+  return;
+ }
+
  entries.forEach(e=>{
   const v=vystavy.find(x=>x.id===e.exhibition_id);
   const z=(animals||[]).find(a=>a.id===e.animal_id);
+  const h=(hodnotenia||[]).find(x=>x.entry_id===e.id);
+
   const d=document.createElement('div');
   d.className='entry';
 
@@ -531,6 +582,67 @@ async function nacitajVsetkyPrihlasky(){
   idInfo.textContent='ID prihlášky: '+e.id+' | Aktuálna klietka: '+(e.cage_number||'nepridelená');
   d.appendChild(idInfo);
 
+  const hr=document.createElement('hr');
+  d.appendChild(hr);
+
+  const heading=document.createElement('h3');
+  heading.textContent='Hodnotenie zvieraťa';
+  d.appendChild(heading);
+
+  const pointsLabel=document.createElement('label');
+  pointsLabel.textContent='Počet bodov';
+  d.appendChild(pointsLabel);
+
+  const points=document.createElement('input');
+  points.type='number';
+  points.min='0';
+  points.max='100';
+  points.placeholder='Zadajte počet bodov';
+  points.value=h?.points??'';
+  points.id='body-'+e.id;
+  d.appendChild(points);
+
+  const awardLabel=document.createElement('label');
+  awardLabel.textContent='Ocenenie';
+  d.appendChild(awardLabel);
+
+  const award=document.createElement('select');
+  award.id='ocenenie-'+e.id;
+
+  const options=[
+   '',
+   'Zlatá medaila',
+   'Strieborná medaila',
+   'Bronzová medaila',
+   'Čestná cena',
+   'Bez ocenenia'
+  ];
+
+  options.forEach(value=>{
+   const o=document.createElement('option');
+   o.value=value;
+   o.textContent=value||'Vyberte ocenenie';
+   award.appendChild(o);
+  });
+
+  award.value=h?.award||'';
+  d.appendChild(award);
+
+  const notesLabel=document.createElement('label');
+  notesLabel.textContent='Poznámka rozhodcu';
+  d.appendChild(notesLabel);
+
+  const notes=document.createElement('textarea');
+  notes.placeholder='Zadajte poznámku k zvieraťu';
+  notes.value=h?.notes||'';
+  notes.id='poznamka-'+e.id;
+  d.appendChild(notes);
+
+  const save=document.createElement('button');
+  save.textContent=h?'Upraviť / uložiť hodnotenie':'Uložiť hodnotenie';
+  save.onclick=()=>ulozHodnotenie(e.id);
+  d.appendChild(save);
+
   box.appendChild(d);
  });
 }
@@ -549,6 +661,60 @@ async function ulozKlietku(id){
  }
 
  sprava('Číslo klietky bolo uložené.');
+ await nacitajVsetkyPrihlasky();
+ await nacitajMojePrihlasky();
+}
+
+async function ulozHodnotenie(entryId){
+ const pointsText=document.getElementById('body-'+entryId).value.trim();
+ const award=document.getElementById('ocenenie-'+entryId).value;
+ const notes=document.getElementById('poznamka-'+entryId).value.trim();
+
+ const points=pointsText===''?null:Number(pointsText);
+
+ if(pointsText!==''&&(!Number.isFinite(points)||points<0||points>100)){
+  sprava('Počet bodov musí byť číslo od 0 do 100.');
+  return;
+ }
+
+ const {data:existujuce,error:selectError}=await db.from('judging')
+ .select('id')
+ .eq('entry_id',entryId)
+ .maybeSingle();
+
+ if(selectError){
+  sprava('Chyba pri kontrole hodnotenia: '+selectError.message);
+  return;
+ }
+
+ const hodnotenie={
+  entry_id:entryId,
+  judge_id:prihlasenyPouzivatel.id,
+  points:points,
+  award:award||null,
+  notes:notes||null
+ };
+
+ let result;
+
+ if(existujuce){
+  result=await db.from('judging')
+  .update({
+   points:hodnotenie.points,
+   award:hodnotenie.award,
+   notes:hodnotenie.notes
+  })
+  .eq('id',existujuce.id);
+ }else{
+  result=await db.from('judging').insert(hodnotenie);
+ }
+
+ if(result.error){
+  sprava('Chyba pri ukladaní hodnotenia: '+result.error.message);
+  return;
+ }
+
+ sprava('Hodnotenie bolo úspešne uložené.');
  await nacitajVsetkyPrihlasky();
  await nacitajMojePrihlasky();
 }
