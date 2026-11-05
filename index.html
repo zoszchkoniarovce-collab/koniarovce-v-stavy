@@ -3,33 +3,39 @@
 <html lang="sk">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Koniarovce Výstavy</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
-body{font-family:Arial,sans-serif;background:#f2f4f1;margin:0;color:#243328}
-header{background:#245b38;color:white;padding:25px 15px;text-align:center}
-main{max-width:480px;margin:25px auto;padding:15px}
-.card{background:white;padding:22px;border-radius:12px;margin-bottom:18px;box-shadow:0 2px 10px #0001}
-h2{margin-top:0;color:#245b38}
-input,button{box-sizing:border-box;width:100%;padding:13px;margin:7px 0;border-radius:7px;font-size:16px}
-input{border:1px solid #ccc}
+body{font-family:Arial;background:#f2f4f1;margin:0;color:#243328}
+header{background:#245b38;color:white;padding:22px;text-align:center}
+main{max-width:650px;margin:20px auto;padding:12px}
+.card{background:white;padding:20px;border-radius:12px;margin-bottom:16px;box-shadow:0 2px 10px #0001}
+h2{color:#245b38}
+input,select,button{box-sizing:border-box;width:100%;padding:12px;margin:6px 0;border-radius:7px;font-size:16px}
+input,select{border:1px solid #ccc;background:white}
 button{border:0;background:#287345;color:white;font-weight:bold;cursor:pointer}
-button.secondary{background:#65756a}
+.secondary{background:#65756a}
+.delete{background:#a83232}
 .hidden{display:none}
-#sprava{padding:10px;color:#245b38}
+.animal{border:1px solid #ddd;padding:12px;border-radius:8px;margin:10px 0}
+#sprava{padding:10px;color:#245b38;overflow-wrap:anywhere}
 </style>
 </head>
 <body>
+
 <header>
 <h1>ZO SZCH KONIAROVCE</h1>
 <p>Výstavný systém</p>
 </header>
+
 <main>
+
 <div id="uvod" class="card">
 <h2>Vitajte na výstave</h2>
-<p>Prihláste sa alebo si vytvorte nový účet vystavovateľa.</p>
-<h3>Registrácia vystavovateľa</h3>
+<p>Vytvorte si účet vystavovateľa alebo sa prihláste.</p>
+
+<h3>Registrácia</h3>
 <input id="meno" placeholder="Meno">
 <input id="priezvisko" placeholder="Priezvisko">
 <input id="emailReg" type="email" placeholder="E-mail">
@@ -37,93 +43,266 @@ button.secondary{background:#65756a}
 <input id="adresa" placeholder="Adresa">
 <input id="hesloReg" type="password" placeholder="Heslo">
 <button onclick="registracia()">Vytvoriť účet</button>
+
 <hr>
 <h3>Prihlásenie</h3>
 <input id="emailPrih" type="email" placeholder="E-mail">
 <input id="hesloPrih" type="password" placeholder="Heslo">
 <button onclick="prihlasenie()">Prihlásiť sa</button>
 </div>
-<div id="ucet" class="card hidden">
+
+<div id="ucet" class="hidden">
+
+<div class="card">
 <h2>Moje konto</h2>
-<p>Ste prihlásený ako:</p>
+<p>Prihlásený používateľ:</p>
 <strong id="pouzivatel"></strong>
-<p>Váš účet vystavovateľa je aktívny.</p>
-<p>Ďalšie funkcie – moje zvieratá, prihlásenie na výstavu a katalóg – doplníme v ďalšom kroku.</p>
 <button class="secondary" onclick="odhlasenie()">Odhlásiť sa</button>
 </div>
+
+<div class="card">
+<h2>Moje zvieratá</h2>
+<p>Tu môžete pridávať a spravovať svoje zvieratá.</p>
+
+<form id="formularZviera">
+<input type="hidden" id="zvieraId">
+
+<label>Kategória zvieraťa</label>
+<select id="kategoria" required>
+<option value="">Vyberte kategóriu</option>
+<option value="Hydina">Hydina</option>
+<option value="Holuby">Holuby</option>
+<option value="Králiky">Králiky</option>
+</select>
+
+<label>Plemeno</label>
+<input id="plemeno" required placeholder="Napr. Australorpka čierna">
+
+<label>Číslo zvieraťa</label>
+<input id="cislo" placeholder="Číslo zvieraťa">
+
+<label>Meno zvieraťa</label>
+<input id="menoZviera" placeholder="Meno (nepovinné)">
+
+<label>Pohlavie</label>
+<select id="pohlavie">
+<option value="">Vyberte pohlavie</option>
+<option value="Samec">Samec</option>
+<option value="Samica">Samica</option>
+</select>
+
+<label>Dátum narodenia</label>
+<input id="narodenie" type="date">
+
+<button type="submit" id="ulozitBtn">Pridať zviera</button>
+<button type="button" class="secondary hidden" id="zrusitBtn" onclick="zrusitUpravu()">Zrušiť úpravu</button>
+</form>
+</div>
+
+<div class="card">
+<h2>Zoznam mojich zvierat</h2>
+<div id="zoznamZvierat">Načítavam zvieratá...</div>
+</div>
+
+</div>
+
 <div id="sprava"></div>
 </main>
+
 <script>
 const SUPABASE_URL = 'https://mdhlgsxlszqiravhwncq.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_iP7ev5CV3GsDikIGPj4U8Q_ueiw7EdR';
 const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+let prihlasenyPouzivatel = null;
+
 function sprava(text) {
-document.getElementById('sprava').textContent = text;
-}
-
-async function registracia() {
-const meno = document.getElementById('meno').value.trim();
-const priezvisko = document.getElementById('priezvisko').value.trim();
-const email = document.getElementById('emailReg').value.trim();
-const telefon = document.getElementById('telefon').value.trim();
-const adresa = document.getElementById('adresa').value.trim();
-const heslo = document.getElementById('hesloReg').value;
-
-if (!meno || !priezvisko || !email || !heslo) {
-sprava('Vyplňte meno, priezvisko, e-mail a heslo.');
-return;
-}
-
-const {error} = await db.auth.signUp({
-email,
-password: heslo,
-options: {
-data: {
-first_name: meno,
-last_name: priezvisko,
-phone: telefon,
-address: adresa
-}
-}
-});
-
-if (error) {
-sprava('Chyba pri registrácii: ' + error.message);
-} else {
-sprava('Registrácia prebehla. Ak je potrebné potvrdenie e-mailu, skontrolujte svoju poštu.');
-}
-}
-
-async function prihlasenie() {
-const email = document.getElementById('emailPrih').value.trim();
-const password = document.getElementById('hesloPrih').value;
-const {error} = await db.auth.signInWithPassword({email, password});
-
-if (error) {
-sprava('Prihlásenie sa nepodarilo: ' + error.message);
-} else {
-sprava('Úspešne ste sa prihlásili.');
-}
-}
-
-async function odhlasenie() {
-await db.auth.signOut();
-sprava('Boli ste odhlásený.');
+ document.getElementById('sprava').textContent = text;
 }
 
 function zobrazUcet(user) {
-document.getElementById('uvod').classList.toggle('hidden', !!user);
-document.getElementById('ucet').classList.toggle('hidden', !user);
-document.getElementById('pouzivatel').textContent = user ? user.email : '';
+ prihlasenyPouzivatel = user;
+ document.getElementById('uvod').classList.toggle('hidden',!!user);
+ document.getElementById('ucet').classList.toggle('hidden',!user);
+ document.getElementById('pouzivatel').textContent = user ? user.email : '';
+ if(user) nacitajZvierata();
 }
 
-db.auth.getSession().then(({data}) => {
-zobrazUcet(data.session?.user || null);
+async function registracia() {
+ const meno=document.getElementById('meno').value.trim();
+ const priezvisko=document.getElementById('priezvisko').value.trim();
+ const email=document.getElementById('emailReg').value.trim();
+ const telefon=document.getElementById('telefon').value.trim();
+ const adresa=document.getElementById('adresa').value.trim();
+ const heslo=document.getElementById('hesloReg').value;
+
+ if(!meno||!priezvisko||!email||!heslo){
+  sprava('Vyplňte meno, priezvisko, e-mail a heslo.');
+  return;
+ }
+
+ const {error}=await db.auth.signUp({
+  email,password:heslo,
+  options:{data:{
+   first_name:meno,
+   last_name:priezvisko,
+   phone:telefon,
+   address:adresa
+  }}
+ });
+
+ sprava(error?'Chyba registrácie: '+error.message:'Registrácia prebehla. Skontrolujte si e-mail, ak je potrebné potvrdenie.');
+}
+
+async function prihlasenie() {
+ const email=document.getElementById('emailPrih').value.trim();
+ const password=document.getElementById('hesloPrih').value;
+ const {error}=await db.auth.signInWithPassword({email,password});
+ if(error) sprava('Chyba prihlásenia: '+error.message);
+ else sprava('Úspešne ste sa prihlásili.');
+}
+
+async function odhlasenie() {
+ await db.auth.signOut();
+ sprava('Boli ste odhlásený.');
+}
+
+async function nacitajZvierata() {
+ const zoznam=document.getElementById('zoznamZvierat');
+ zoznam.textContent='Načítavam...';
+
+ const {data,error}=await db.from('animals')
+  .select('*')
+  .eq('owner_id',prihlasenyPouzivatel.id)
+  .order('created_at',{ascending:false});
+
+ if(error){
+  zoznam.textContent='Chyba pri načítaní: '+error.message;
+  return;
+ }
+
+ zoznam.innerHTML='';
+
+ if(!data.length){
+  zoznam.textContent='Zatiaľ nemáte pridané žiadne zvieratá.';
+  return;
+ }
+
+ data.forEach(z=>{
+  const div=document.createElement('div');
+  div.className='animal';
+
+  const nadpis=document.createElement('strong');
+  nadpis.textContent=z.category+' – '+z.breed;
+  div.appendChild(nadpis);
+
+  const udaje=document.createElement('p');
+  udaje.textContent=
+   'Číslo: '+(z.animal_number||'—')+
+   ' | Meno: '+(z.name||'—')+
+   ' | Pohlavie: '+(z.sex||'—')+
+   ' | Narodenie: '+(z.birth||'—');
+  div.appendChild(udaje);
+
+  const upravit=document.createElement('button');
+  upravit.textContent='Upraviť';
+  upravit.onclick=()=>upravZviera(z);
+  div.appendChild(upravit);
+
+  const zmazat=document.createElement('button');
+  zmazat.textContent='Vymazať';
+  zmazat.className='delete';
+  zmazat.onclick=()=>vymazZviera(z.id);
+  div.appendChild(zmazat);
+
+  zoznam.appendChild(div);
+ });
+}
+
+document.getElementById('formularZviera').addEventListener('submit',async function(e){
+ e.preventDefault();
+
+ if(!prihlasenyPouzivatel){
+  sprava('Najskôr sa prihláste.');
+  return;
+ }
+
+ const id=document.getElementById('zvieraId').value;
+
+ const zviera={
+  category:document.getElementById('kategoria').value,
+  breed:document.getElementById('plemeno').value.trim(),
+  animal_number:document.getElementById('cislo').value.trim(),
+  name:document.getElementById('menoZviera').value.trim(),
+  sex:document.getElementById('pohlavie').value,
+  birth:document.getElementById('narodenie').value||null
+ };
+
+ let vysledok;
+
+ if(id){
+  vysledok=await db.from('animals')
+   .update(zviera)
+   .eq('id',id)
+   .eq('owner_id',prihlasenyPouzivatel.id);
+ }else{
+  vysledok=await db.from('animals')
+   .insert({...zviera,owner_id:prihlasenyPouzivatel.id});
+ }
+
+ if(vysledok.error){
+  sprava('Chyba pri ukladaní: '+vysledok.error.message);
+  return;
+ }
+
+ sprava(id?'Zviera bolo upravené.':'Zviera bolo pridané.');
+ zrusitUpravu();
+ nacitajZvierata();
 });
 
-db.auth.onAuthStateChange((_event, session) => {
-zobrazUcet(session?.user || null);
+function upravZviera(z){
+ document.getElementById('zvieraId').value=z.id;
+ document.getElementById('kategoria').value=z.category||'';
+ document.getElementById('plemeno').value=z.breed||'';
+ document.getElementById('cislo').value=z.animal_number||'';
+ document.getElementById('menoZviera').value=z.name||'';
+ document.getElementById('pohlavie').value=z.sex||'';
+ document.getElementById('narodenie').value=z.birth||'';
+ document.getElementById('ulozitBtn').textContent='Uložiť zmeny';
+ document.getElementById('zrusitBtn').classList.remove('hidden');
+ document.getElementById('formularZviera').scrollIntoView({behavior:'smooth'});
+}
+
+function zrusitUpravu(){
+ document.getElementById('formularZviera').reset();
+ document.getElementById('zvieraId').value='';
+ document.getElementById('ulozitBtn').textContent='Pridať zviera';
+ document.getElementById('zrusitBtn').classList.add('hidden');
+}
+
+async function vymazZviera(id){
+ if(!confirm('Naozaj chcete vymazať toto zviera?')) return;
+
+ const {error}=await db.from('animals')
+  .delete()
+  .eq('id',id)
+  .eq('owner_id',prihlasenyPouzivatel.id);
+
+ if(error){
+  sprava('Chyba pri mazaní: '+error.message);
+  return;
+ }
+
+ sprava('Zviera bolo vymazané.');
+ nacitajZvierata();
+}
+
+db.auth.getSession().then(({data})=>{
+ zobrazUcet(data.session?.user||null);
+});
+
+db.auth.onAuthStateChange((_event,session)=>{
+ zobrazUcet(session?.user||null);
 });
 </script>
 </body>
