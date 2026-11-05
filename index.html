@@ -5,75 +5,126 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Koniarovce Výstavy</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
-*{box-sizing:border-box}
-body{margin:0;font-family:Arial,sans-serif;background:#f2f6f2;color:#24352b}
-header{background:#176b45;color:white;padding:28px 18px;text-align:center}
-header h1{margin:0;font-size:27px}
-header p{margin:9px 0 0}
-main{max-width:850px;margin:28px auto;padding:16px}
-.card{background:white;border-radius:14px;padding:24px;margin-bottom:18px;box-shadow:0 3px 15px #00000010}
-h2{color:#176b45;margin-top:0}
-.buttons{display:flex;gap:12px;flex-wrap:wrap}
-button{border:0;border-radius:8px;padding:13px 20px;background:#176b45;color:white;font-size:16px;cursor:pointer}
-button.secondary{background:#e5eee8;color:#176b45}
-input{width:100%;padding:13px;margin:7px 0 14px;border:1px solid #ccd8cf;border-radius:7px;font-size:16px}
-footer{text-align:center;color:#718077;padding:25px}
+body{font-family:Arial,sans-serif;background:#f2f4f1;margin:0;color:#243328}
+header{background:#245b38;color:white;padding:25px 15px;text-align:center}
+main{max-width:480px;margin:25px auto;padding:15px}
+.card{background:white;padding:22px;border-radius:12px;margin-bottom:18px;box-shadow:0 2px 10px #0001}
+h2{margin-top:0;color:#245b38}
+input,button{box-sizing:border-box;width:100%;padding:13px;margin:7px 0;border-radius:7px;font-size:16px}
+input{border:1px solid #ccc}
+button{border:0;background:#287345;color:white;font-weight:bold;cursor:pointer}
+button.secondary{background:#65756a}
 .hidden{display:none}
+#sprava{padding:10px;color:#245b38}
 </style>
 </head>
 <body>
 <header>
 <h1>ZO SZCH KONIAROVCE</h1>
-<p>Online výstavný systém</p>
+<p>Výstavný systém</p>
 </header>
 <main>
-<section class="card">
-<h2>Vitajte vo výstavnom systéme</h2>
-<p>Prihlasovanie zvierat, správa výstav, hodnotenie a výsledky na jednom mieste.</p>
-<div class="buttons">
-<button onclick="show('login')">Prihlásiť sa</button>
-<button class="secondary" onclick="show('register')">Vytvoriť účet</button>
+<div id="uvod" class="card">
+<h2>Vitajte na výstave</h2>
+<p>Prihláste sa alebo si vytvorte nový účet vystavovateľa.</p>
+<h3>Registrácia vystavovateľa</h3>
+<input id="meno" placeholder="Meno">
+<input id="priezvisko" placeholder="Priezvisko">
+<input id="emailReg" type="email" placeholder="E-mail">
+<input id="telefon" placeholder="Telefón">
+<input id="adresa" placeholder="Adresa">
+<input id="hesloReg" type="password" placeholder="Heslo">
+<button onclick="registracia()">Vytvoriť účet</button>
+<hr>
+<h3>Prihlásenie</h3>
+<input id="emailPrih" type="email" placeholder="E-mail">
+<input id="hesloPrih" type="password" placeholder="Heslo">
+<button onclick="prihlasenie()">Prihlásiť sa</button>
 </div>
-</section>
-<section id="login" class="card hidden">
-<h2>Prihlásenie</h2>
-<label>E-mail</label>
-<input type="email" placeholder="Váš e-mail">
-<label>Heslo</label>
-<input type="password" placeholder="Vaše heslo">
-<button onclick="alert('Prihlasovanie pripojíme k databáze v ďalšom kroku.')">Prihlásiť sa</button>
-</section>
-<section id="register" class="card hidden">
-<h2>Registrácia vystavovateľa</h2>
-<label>Meno</label>
-<input placeholder="Meno">
-<label>Priezvisko</label>
-<input placeholder="Priezvisko">
-<label>E-mail</label>
-<input type="email" placeholder="E-mail">
-<label>Telefón</label>
-<input type="tel" placeholder="Telefón">
-<label>Heslo</label>
-<input type="password" placeholder="Vytvorte heslo">
-<button onclick="alert('Registráciu pripojíme k databáze v ďalšom kroku.')">Registrovať sa</button>
-</section>
-<section class="card">
-<h2>Čo systém ponúkne?</h2>
-<ul>
-<li>Účet každého vystavovateľa</li>
-<li>Databázu vlastných zvierat</li>
-<li>Prihlasovanie na výstavy</li>
-<li>Hodnotenie rozhodcami</li>
-<li>Výstavné katalógy a výsledky</li>
-</ul>
-</section>
+<div id="ucet" class="card hidden">
+<h2>Moje konto</h2>
+<p>Ste prihlásený ako:</p>
+<strong id="pouzivatel"></strong>
+<p>Váš účet vystavovateľa je aktívny.</p>
+<p>Ďalšie funkcie – moje zvieratá, prihlásenie na výstavu a katalóg – doplníme v ďalšom kroku.</p>
+<button class="secondary" onclick="odhlasenie()">Odhlásiť sa</button>
+</div>
+<div id="sprava"></div>
 </main>
-<footer>ZO SZCH Koniarovce © 2026</footer>
 <script>
-function show(id){
-document.getElementById(id).classList.toggle('hidden');
+const SUPABASE_URL = 'https://mdhlgsxlszqiravhwncq.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_iP7ev5CV3GsDikIGPj4U8Q_ueiw7EdR';
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+function sprava(text) {
+document.getElementById('sprava').textContent = text;
 }
+
+async function registracia() {
+const meno = document.getElementById('meno').value.trim();
+const priezvisko = document.getElementById('priezvisko').value.trim();
+const email = document.getElementById('emailReg').value.trim();
+const telefon = document.getElementById('telefon').value.trim();
+const adresa = document.getElementById('adresa').value.trim();
+const heslo = document.getElementById('hesloReg').value;
+
+if (!meno || !priezvisko || !email || !heslo) {
+sprava('Vyplňte meno, priezvisko, e-mail a heslo.');
+return;
+}
+
+const {error} = await db.auth.signUp({
+email,
+password: heslo,
+options: {
+data: {
+first_name: meno,
+last_name: priezvisko,
+phone: telefon,
+address: adresa
+}
+}
+});
+
+if (error) {
+sprava('Chyba pri registrácii: ' + error.message);
+} else {
+sprava('Registrácia prebehla. Ak je potrebné potvrdenie e-mailu, skontrolujte svoju poštu.');
+}
+}
+
+async function prihlasenie() {
+const email = document.getElementById('emailPrih').value.trim();
+const password = document.getElementById('hesloPrih').value;
+const {error} = await db.auth.signInWithPassword({email, password});
+
+if (error) {
+sprava('Prihlásenie sa nepodarilo: ' + error.message);
+} else {
+sprava('Úspešne ste sa prihlásili.');
+}
+}
+
+async function odhlasenie() {
+await db.auth.signOut();
+sprava('Boli ste odhlásený.');
+}
+
+function zobrazUcet(user) {
+document.getElementById('uvod').classList.toggle('hidden', !!user);
+document.getElementById('ucet').classList.toggle('hidden', !user);
+document.getElementById('pouzivatel').textContent = user ? user.email : '';
+}
+
+db.auth.getSession().then(({data}) => {
+zobrazUcet(data.session?.user || null);
+});
+
+db.auth.onAuthStateChange((_event, session) => {
+zobrazUcet(session?.user || null);
+});
 </script>
 </body>
 </html>
