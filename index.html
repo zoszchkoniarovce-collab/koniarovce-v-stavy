@@ -30,7 +30,6 @@ button{border:0;background:#287345;color:white;font-weight:bold;cursor:pointer}
 </header>
 
 <main>
-
 <div id="uvod" class="card">
 <h2>Vitajte na výstave</h2>
 <p>Vytvorte si účet vystavovateľa alebo sa prihláste.</p>
@@ -52,7 +51,6 @@ button{border:0;background:#287345;color:white;font-weight:bold;cursor:pointer}
 </div>
 
 <div id="ucet" class="hidden">
-
 <div class="card">
 <h2>Moje konto</h2>
 <p>Prihlásený používateľ:</p>
@@ -62,7 +60,7 @@ button{border:0;background:#287345;color:white;font-weight:bold;cursor:pointer}
 
 <div class="card">
 <h2>Moje zvieratá</h2>
-<p>Tu môžete pridávať a spravovať svoje zvieratá.</p>
+<p>Pridajte si svoje zvieratá do evidencie.</p>
 
 <form id="formularZviera">
 <input type="hidden" id="zvieraId">
@@ -81,18 +79,12 @@ button{border:0;background:#287345;color:white;font-weight:bold;cursor:pointer}
 <label>Číslo zvieraťa</label>
 <input id="cislo" placeholder="Číslo zvieraťa">
 
-<label>Meno zvieraťa</label>
-<input id="menoZviera" placeholder="Meno (nepovinné)">
-
 <label>Pohlavie</label>
 <select id="pohlavie">
 <option value="">Vyberte pohlavie</option>
 <option value="Samec">Samec</option>
 <option value="Samica">Samica</option>
 </select>
-
-<label>Dátum narodenia</label>
-<input id="narodenie" type="date">
 
 <button type="submit" id="ulozitBtn">Pridať zviera</button>
 <button type="button" class="secondary hidden" id="zrusitBtn" onclick="zrusitUpravu()">Zrušiť úpravu</button>
@@ -103,7 +95,6 @@ button{border:0;background:#287345;color:white;font-weight:bold;cursor:pointer}
 <h2>Zoznam mojich zvierat</h2>
 <div id="zoznamZvierat">Načítavam zvieratá...</div>
 </div>
-
 </div>
 
 <div id="sprava"></div>
@@ -172,7 +163,7 @@ async function nacitajZvierata() {
  zoznam.textContent='Načítavam...';
 
  const {data,error}=await db.from('animals')
-  .select('*')
+  .select('id,category,breed,animal_number,sex,created_at')
   .eq('owner_id',prihlasenyPouzivatel.id)
   .order('created_at',{ascending:false});
 
@@ -197,11 +188,7 @@ async function nacitajZvierata() {
   div.appendChild(nadpis);
 
   const udaje=document.createElement('p');
-  udaje.textContent=
-   'Číslo: '+(z.animal_number||'—')+
-   ' | Meno: '+(z.name||'—')+
-   ' | Pohlavie: '+(z.sex||'—')+
-   ' | Narodenie: '+(z.birth||'—');
+  udaje.textContent='Číslo: '+(z.animal_number||'—')+' | Pohlavie: '+(z.sex||'—');
   div.appendChild(udaje);
 
   const upravit=document.createElement('button');
@@ -233,9 +220,7 @@ document.getElementById('formularZviera').addEventListener('submit',async functi
   category:document.getElementById('kategoria').value,
   breed:document.getElementById('plemeno').value.trim(),
   animal_number:document.getElementById('cislo').value.trim(),
-  name:document.getElementById('menoZviera').value.trim(),
-  sex:document.getElementById('pohlavie').value,
-  birth:document.getElementById('narodenie').value||null
+  sex:document.getElementById('pohlavie').value
  };
 
  let vysledok;
@@ -265,9 +250,7 @@ function upravZviera(z){
  document.getElementById('kategoria').value=z.category||'';
  document.getElementById('plemeno').value=z.breed||'';
  document.getElementById('cislo').value=z.animal_number||'';
- document.getElementById('menoZviera').value=z.name||'';
  document.getElementById('pohlavie').value=z.sex||'';
- document.getElementById('narodenie').value=z.birth||'';
  document.getElementById('ulozitBtn').textContent='Uložiť zmeny';
  document.getElementById('zrusitBtn').classList.remove('hidden');
  document.getElementById('formularZviera').scrollIntoView({behavior:'smooth'});
