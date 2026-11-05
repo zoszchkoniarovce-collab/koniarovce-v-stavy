@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="sk">
 <head>
@@ -476,29 +475,82 @@ async function vytvorVystavu(){
 async function nacitajVsetkyPrihlasky(){
  const box=document.getElementById('vsetkyPrihlasky');
 
- const {data,error}=await db.from('entries')
+ const {data:entries,error}=await db.from('entries')
  .select('id,exhibition_id,animal_id,cage_number,entry_status,created_at')
  .order('created_at',{ascending:false});
 
  if(error){
-  box.textContent='Chyba pri načítaní: '+error.message;
+  box.textContent='Chyba pri načítaní prihlášok: '+error.message;
   return;
  }
 
  box.innerHTML='';
 
- if(!data?.length){
+ if(!entries?.length){
   box.textContent='Zatiaľ nie sú žiadne prihlášky.';
   return;
  }
 
- data.forEach(e=>{
+ const animalIds=[...new Set(entries.map(e=>e.animal_id))];
+ const {data:animals,error:animalError}=await db.from('animals')
+ .select('id,category,breed,animal_number,sex')
+ .in('id',animalIds);
+
+ if(animalError){
+  box.textContent='Chyba pri načítaní zvierat: '+animalError.message;
+  return;
+ }
+
+ entries.forEach(e=>{
   const v=vystavy.find(x=>x.id===e.exhibition_id);
+  const z=(animals||[]).find(a=>a.id===e.animal_id);
   const d=document.createElement('div');
   d.className='entry';
-  d.textContent=(v?.name||'Výstava')+' — ID zvieraťa: '+e.animal_id+' — ID prihlášky: '+e.id+' — klietka: '+(e.cage_number||'nepridelená')+' — stav: '+(e.entry_status||'prijatá');
+
+  const info=document.createElement('p');
+  info.textContent=(v?.name||'Výstava')+' — '+(z?.category||'Zviera')+' — plemeno: '+(z?.breed||'neuvedené')+' — číslo zvieraťa: '+(z?.animal_number||'—')+' — pohlavie: '+(z?.sex||'—')+' — stav: '+(e.entry_status||'prijatá');
+  d.appendChild(info);
+
+  const label=document.createElement('label');
+  label.textContent='Číslo klietky';
+  d.appendChild(label);
+
+  const input=document.createElement('input');
+  input.type='text';
+  input.placeholder='Zadajte číslo klietky';
+  input.value=e.cage_number||'';
+  input.id='klietka-'+e.id;
+  d.appendChild(input);
+
+  const button=document.createElement('button');
+  button.textContent='Uložiť číslo klietky';
+  button.onclick=()=>ulozKlietku(e.id);
+  d.appendChild(button);
+
+  const idInfo=document.createElement('small');
+  idInfo.textContent='ID prihlášky: '+e.id+' | Aktuálna klietka: '+(e.cage_number||'nepridelená');
+  d.appendChild(idInfo);
+
   box.appendChild(d);
  });
+}
+
+async function ulozKlietku(id){
+ const input=document.getElementById('klietka-'+id);
+ const cage_number=input.value.trim();
+
+ const {error}=await db.from('entries')
+ .update({cage_number:cage_number||null})
+ .eq('id',id);
+
+ if(error){
+  sprava('Chyba pri ukladaní čísla klietky: '+error.message);
+  return;
+ }
+
+ sprava('Číslo klietky bolo uložené.');
+ await nacitajVsetkyPrihlasky();
+ await nacitajMojePrihlasky();
 }
 
 db.auth.getSession().then(({data})=>{
