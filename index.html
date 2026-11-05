@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="sk">
 <head>
@@ -11,9 +12,8 @@ header{background:#245b38;color:white;padding:22px;text-align:center}
 main{max-width:760px;margin:20px auto;padding:12px}
 .card{background:white;padding:20px;border-radius:12px;margin-bottom:16px;box-shadow:0 2px 10px #0001}
 h2{color:#245b38}
-input,select,button,textarea{box-sizing:border-box;width:100%;padding:12px;margin:6px 0;border-radius:7px;font-size:16px}
-input,select,textarea{border:1px solid #ccc;background:white}
-textarea{min-height:75px;font-family:Arial}
+input,select,button{box-sizing:border-box;width:100%;padding:12px;margin:6px 0;border-radius:7px;font-size:16px}
+input,select{border:1px solid #ccc;background:white}
 button{border:0;background:#287345;color:white;font-weight:bold;cursor:pointer}
 .secondary{background:#65756a}
 .delete{background:#a83232}
@@ -21,7 +21,7 @@ button{border:0;background:#287345;color:white;font-weight:bold;cursor:pointer}
 .animal,.entry,.exhibition{border:1px solid #ddd;padding:12px;border-radius:8px;margin:10px 0}
 #sprava{padding:10px;color:#245b38;overflow-wrap:anywhere}
 label{display:block;margin-top:8px;font-weight:bold}
-.result{background:#edf5ee;padding:12px;border-radius:8px;margin-top:10px}
+.result{background:#f0f6f1;padding:12px;border-radius:8px;margin-top:10px}
 </style>
 </head>
 <body>
@@ -126,6 +126,7 @@ label{display:block;margin-top:8px;font-weight:bold}
 
 <div class="card">
 <h2>Všetky prihlášky – administrátor</h2>
+<p>Tu môžete prideľovať klietky a zapisovať výsledky zvierat.</p>
 <div id="vsetkyPrihlasky">Načítavam všetky prihlášky...</div>
 </div>
 </div>
@@ -143,6 +144,14 @@ let prihlasenyPouzivatel=null;
 let mojeZvierata=[];
 let vystavy=[];
 let jeAdmin=false;
+
+const ocenenia=[
+ 'Bez ocenenia',
+ 'Víťaz výstavy',
+ 'Čestná cena',
+ 'Pohár starostu obce',
+ 'Najkrajšie národné plemeno'
+];
 
 function sprava(t){
  document.getElementById('sprava').textContent=t;
@@ -435,12 +444,12 @@ async function nacitajMojePrihlasky(){
  }
 
  const entryIds=moje.map(e=>e.id);
- const {data:hodnotenia,error:hodError}=await db.from('judging')
- .select('id,entry_id,points,award,notes')
+ const {data:hodnotenia,error:hodnotenieError}=await db.from('judging')
+ .select('entry_id,points,award,notes')
  .in('entry_id',entryIds);
 
- if(hodError){
-  box.textContent='Chyba pri načítaní hodnotení: '+hodError.message;
+ if(hodnotenieError){
+  box.textContent='Chyba pri načítaní hodnotení: '+hodnotenieError.message;
   return;
  }
 
@@ -452,30 +461,33 @@ async function nacitajMojePrihlasky(){
   const d=document.createElement('div');
   d.className='entry';
 
-  const title=document.createElement('strong');
-  title.textContent=(v?.name||'Výstava');
-  d.appendChild(title);
+  const info=document.createElement('strong');
+  info.textContent=(v?.name||'Výstava');
+  d.appendChild(info);
 
   const p=document.createElement('p');
-  p.textContent=(z?.category||'Zviera')+' — '+(z?.breed||'')+' — klietka: '+(e.cage_number||'zatiaľ nepridelená')+' — stav: '+(e.entry_status||'prijatá');
+  p.textContent=(z?.category||'Zviera')+' — '+(z?.breed||'')+' — číslo: '+(z?.animal_number||'—')+' — klietka: '+(e.cage_number||'zatiaľ nepridelená')+' — stav: '+(e.entry_status||'prijatá');
   d.appendChild(p);
 
   const result=document.createElement('div');
   result.className='result';
 
-  const heading=document.createElement('strong');
-  heading.textContent='Hodnotenie zvieraťa';
-  result.appendChild(heading);
+  const title=document.createElement('strong');
+  title.textContent='Hodnotenie zvieraťa';
+  result.appendChild(title);
 
-  const details=document.createElement('p');
+  const points=document.createElement('p');
+  points.textContent='Počet bodov: '+(h?.points??'Zatiaľ nehodnotené');
+  result.appendChild(points);
 
-  if(h){
-   details.textContent='Body: '+(h.points??'—')+' | Ocenenie: '+(h.award||'bez ocenenia')+' | Poznámka: '+(h.notes||'bez poznámky');
-  }else{
-   details.textContent='Hodnotenie zatiaľ nebolo zadané.';
-  }
+  const award=document.createElement('p');
+  award.textContent='Ocenenie: '+(h?.award||'—');
+  result.appendChild(award);
 
-  result.appendChild(details);
+  const notes=document.createElement('p');
+  notes.textContent='Poznámka: '+(h?.notes||'—');
+  result.appendChild(notes);
+
   d.appendChild(result);
   box.appendChild(d);
  });
@@ -531,6 +543,8 @@ async function nacitajVsetkyPrihlasky(){
  }
 
  const animalIds=[...new Set(entries.map(e=>e.animal_id))];
+ const entryIds=entries.map(e=>e.id);
+
  const {data:animals,error:animalError}=await db.from('animals')
  .select('id,category,breed,animal_number,sex')
  .in('id',animalIds);
@@ -540,13 +554,12 @@ async function nacitajVsetkyPrihlasky(){
   return;
  }
 
- const entryIds=entries.map(e=>e.id);
- const {data:hodnotenia,error:hodError}=await db.from('judging')
+ const {data:hodnotenia,error:hodnotenieError}=await db.from('judging')
  .select('id,entry_id,points,award,notes')
  .in('entry_id',entryIds);
 
- if(hodError){
-  box.textContent='Chyba pri načítaní hodnotení: '+hodError.message;
+ if(hodnotenieError){
+  box.textContent='Chyba pri načítaní hodnotení: '+hodnotenieError.message;
   return;
  }
 
@@ -562,85 +575,82 @@ async function nacitajVsetkyPrihlasky(){
   info.textContent=(v?.name||'Výstava')+' — '+(z?.category||'Zviera')+' — plemeno: '+(z?.breed||'neuvedené')+' — číslo zvieraťa: '+(z?.animal_number||'—')+' — pohlavie: '+(z?.sex||'—')+' — stav: '+(e.entry_status||'prijatá');
   d.appendChild(info);
 
-  const label=document.createElement('label');
-  label.textContent='Číslo klietky';
-  d.appendChild(label);
+  const cageLabel=document.createElement('label');
+  cageLabel.textContent='Číslo klietky';
+  d.appendChild(cageLabel);
 
-  const input=document.createElement('input');
-  input.type='text';
-  input.placeholder='Zadajte číslo klietky';
-  input.value=e.cage_number||'';
-  input.id='klietka-'+e.id;
-  d.appendChild(input);
+  const cageInput=document.createElement('input');
+  cageInput.type='text';
+  cageInput.placeholder='Zadajte číslo klietky';
+  cageInput.value=e.cage_number||'';
+  cageInput.id='klietka-'+e.id;
+  d.appendChild(cageInput);
 
-  const button=document.createElement('button');
-  button.textContent='Uložiť číslo klietky';
-  button.onclick=()=>ulozKlietku(e.id);
-  d.appendChild(button);
+  const cageButton=document.createElement('button');
+  cageButton.textContent='Uložiť číslo klietky';
+  cageButton.onclick=()=>ulozKlietku(e.id);
+  d.appendChild(cageButton);
 
-  const idInfo=document.createElement('small');
-  idInfo.textContent='ID prihlášky: '+e.id+' | Aktuálna klietka: '+(e.cage_number||'nepridelená');
-  d.appendChild(idInfo);
+  const divider=document.createElement('hr');
+  d.appendChild(divider);
 
-  const hr=document.createElement('hr');
-  d.appendChild(hr);
-
-  const heading=document.createElement('h3');
-  heading.textContent='Hodnotenie zvieraťa';
-  d.appendChild(heading);
+  const resultTitle=document.createElement('h3');
+  resultTitle.textContent='Hodnotenie zvieraťa';
+  d.appendChild(resultTitle);
 
   const pointsLabel=document.createElement('label');
   pointsLabel.textContent='Počet bodov';
   d.appendChild(pointsLabel);
 
-  const points=document.createElement('input');
-  points.type='number';
-  points.min='0';
-  points.max='100';
-  points.placeholder='Zadajte počet bodov';
-  points.value=h?.points??'';
-  points.id='body-'+e.id;
-  d.appendChild(points);
+  const pointsInput=document.createElement('input');
+  pointsInput.type='number';
+  pointsInput.min='0';
+  pointsInput.step='0.5';
+  pointsInput.placeholder='Zadajte počet bodov';
+  pointsInput.value=h?.points??'';
+  pointsInput.id='body-'+e.id;
+  d.appendChild(pointsInput);
 
   const awardLabel=document.createElement('label');
   awardLabel.textContent='Ocenenie';
   d.appendChild(awardLabel);
 
-  const award=document.createElement('select');
-  award.id='ocenenie-'+e.id;
+  const awardSelect=document.createElement('select');
+  awardSelect.id='ocenenie-'+e.id;
 
-  const options=[
-   '',
-   'Víťaz výstavy',
-   'Čestná cena',
-   'Pohár starostu obce',
-   'Najkrajšie národné plemeno'
-  ];
-
-  options.forEach(value=>{
-   const o=document.createElement('option');
-   o.value=value;
-   o.textContent=value||'Vyberte ocenenie';
-   award.appendChild(o);
+  ocenenia.forEach(o=>{
+   const option=document.createElement('option');
+   option.value=o==='Bez ocenenia'?'':o;
+   option.textContent=o;
+   awardSelect.appendChild(option);
   });
 
-  award.value=h?.award||'';
-  d.appendChild(award);
+  awardSelect.value=h?.award||'';
+  d.appendChild(awardSelect);
 
   const notesLabel=document.createElement('label');
-  notesLabel.textContent='Poznámka rozhodcu';
+  notesLabel.textContent='Poznámka k hodnoteniu';
   d.appendChild(notesLabel);
 
-  const notes=document.createElement('textarea');
-  notes.placeholder='Zadajte poznámku k zvieraťu';
-  notes.value=h?.notes||'';
-  notes.id='poznamka-'+e.id;
-  d.appendChild(notes);
+  const notesInput=document.createElement('input');
+  notesInput.type='text';
+  notesInput.placeholder='Poznámka rozhodcu';
+  notesInput.value=h?.notes||'';
+  notesInput.id='poznamka-'+e.id;
+  d.appendChild(notesInput);
 
-  const save=document.createElement('button');
-  save.textContent=h?'Upraviť / uložiť hodnotenie':'Uložiť hodnotenie';
-  save.onclick=()=>ulozHodnotenie(e.id);
-  d.appendChild(save);
+  const saveButton=document.createElement('button');
+  saveButton.textContent='Uložiť hodnotenie';
+  saveButton.onclick=()=>ulozHodnotenie(e.id);
+  d.appendChild(saveButton);
+
+  const status=document.createElement('p');
+  status.textContent=h?'Hodnotenie je uložené.':'Zatiaľ bez hodnotenia.';
+  d.appendChild(status);
+
+  const idInfo=document.createElement('small');
+  idInfo.textContent='ID prihlášky: '+e.id+' | Klietka: '+(e.cage_number||'nepridelená');
+  d.appendChild(idInfo);
 
   box.appendChild(d);
  });
@@ -665,16 +675,23 @@ async function ulozKlietku(id){
 }
 
 async function ulozHodnotenie(entryId){
- const pointsText=document.getElementById('body-'+entryId).value.trim();
+ const pointsValue=document.getElementById('body-'+entryId).value;
  const award=document.getElementById('ocenenie-'+entryId).value;
  const notes=document.getElementById('poznamka-'+entryId).value.trim();
 
- const points=pointsText===''?null:Number(pointsText);
+ const points=pointsValue===''?null:Number(pointsValue);
 
- if(pointsText!==''&&(!Number.isFinite(points)||points<0||points>100)){
-  sprava('Počet bodov musí byť číslo od 0 do 100.');
+ if(points!==null&&(!Number.isFinite(points)||points<0)){
+  sprava('Zadajte platný počet bodov.');
   return;
  }
+
+ const hodnotenie={
+  entry_id:entryId,
+  points,
+  award:award||null,
+  notes:notes||null
+ };
 
  const {data:existujuce,error:selectError}=await db.from('judging')
  .select('id')
@@ -686,30 +703,21 @@ async function ulozHodnotenie(entryId){
   return;
  }
 
- const hodnotenie={
-  entry_id:entryId,
-  judge_id:prihlasenyPouzivatel.id,
-  points:points,
-  award:award||null,
-  notes:notes||null
- };
-
- let result;
+ let error;
 
  if(existujuce){
-  result=await db.from('judging')
-  .update({
-   points:hodnotenie.points,
-   award:hodnotenie.award,
-   notes:hodnotenie.notes
-  })
+  const vysledok=await db.from('judging')
+  .update(hodnotenie)
   .eq('id',existujuce.id);
+  error=vysledok.error;
  }else{
-  result=await db.from('judging').insert(hodnotenie);
+  const vysledok=await db.from('judging')
+  .insert(hodnotenie);
+  error=vysledok.error;
  }
 
- if(result.error){
-  sprava('Chyba pri ukladaní hodnotenia: '+result.error.message);
+ if(error){
+  sprava('Chyba pri ukladaní hodnotenia: '+error.message);
   return;
  }
 
