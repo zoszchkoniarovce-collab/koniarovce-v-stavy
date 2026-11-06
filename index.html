@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="sk">
 <head>
@@ -192,7 +193,7 @@ async function nacitajVerejneVysledky(){
 
  if(error){
   box.textContent='Výsledky sa nepodarilo načítať.';
-  console.error('Chyba verejných výsledkov:',error);
+  console.error(error);
   return;
  }
 
@@ -481,6 +482,15 @@ async function nacitajVystavy(){
   const p=document.createElement('p');
   p.textContent=(v.location||'Miesto neurčené')+' | '+(v.start_date||'')+' – '+(v.end_date||'')+' | Uzávierka: '+(v.registration_deadline||'')+' | '+(v.status||'');
   d.appendChild(p);
+
+  if(jeAdmin){
+   const deleteButton=document.createElement('button');
+   deleteButton.textContent='Vymazať výstavu';
+   deleteButton.className='delete';
+   deleteButton.onclick=()=>vymazVystavu(v.id,v.name);
+   d.appendChild(deleteButton);
+  }
+
   box.appendChild(d);
 
   const o=document.createElement('option');
@@ -488,6 +498,61 @@ async function nacitajVystavy(){
   o.textContent=v.name+' ('+(v.start_date||'')+')';
   sel.appendChild(o);
  });
+}
+
+async function vymazVystavu(id,nazov){
+ if(!jeAdmin){
+  sprava('Túto akciu môže vykonať iba administrátor.');
+  return;
+ }
+
+ if(!confirm('Naozaj chcete vymazať výstavu "'+nazov+'" vrátane všetkých jej prihlášok a hodnotení?')) return;
+
+ const {data:entries,error:entriesError}=await db.from('entries')
+ .select('id')
+ .eq('exhibition_id',id);
+
+ if(entriesError){
+  sprava('Chyba pri načítaní prihlášok výstavy: '+entriesError.message);
+  return;
+ }
+
+ const entryIds=(entries||[]).map(e=>e.id);
+
+ if(entryIds.length){
+  const {error:judgingError}=await db.from('judging')
+  .delete()
+  .in('entry_id',entryIds);
+
+  if(judgingError){
+   sprava('Chyba pri mazaní hodnotení: '+judgingError.message);
+   return;
+  }
+
+  const {error:deleteEntriesError}=await db.from('entries')
+  .delete()
+  .eq('exhibition_id',id);
+
+  if(deleteEntriesError){
+   sprava('Chyba pri mazaní prihlášok: '+deleteEntriesError.message);
+   return;
+  }
+ }
+
+ const {error}=await db.from('exhibitions')
+ .delete()
+ .eq('id',id);
+
+ if(error){
+  sprava('Chyba pri mazaní výstavy: '+error.message);
+  return;
+ }
+
+ sprava('Výstava a jej prihlášky boli vymazané.');
+ await nacitajVystavy();
+ await nacitajMojePrihlasky();
+ await nacitajVsetkyPrihlasky();
+ await nacitajVerejneVysledky();
 }
 
 function naplnVyberZviera(){
@@ -628,7 +693,6 @@ async function vytvorVystavu(){
  await nacitajVystavy();
 }
 
-/* ADMIN – PRIHLASKY AJ S MENOM VYSTAVOVATELA */
 async function nacitajVsetkyPrihlasky(){
  const box=document.getElementById('vsetkyPrihlasky');
 
@@ -778,12 +842,50 @@ async function nacitajVsetkyPrihlasky(){
   status.textContent=h?'Hodnotenie je uložené.':'Zatiaľ bez hodnotenia.';
   d.appendChild(status);
 
+  const deleteEntryButton=document.createElement('button');
+  deleteEntryButton.textContent='Vymazať prihlášku';
+  deleteEntryButton.className='delete';
+  deleteEntryButton.onclick=()=>vymazPrihlasku(e.id);
+  d.appendChild(deleteEntryButton);
+
   const idInfo=document.createElement('small');
   idInfo.textContent='ID prihlášky: '+e.id+' | Klietka: '+(e.cage_number||'nepridelená');
   d.appendChild(idInfo);
 
   box.appendChild(d);
  });
+}
+
+async function vymazPrihlasku(entryId){
+ if(!jeAdmin){
+  sprava('Túto akciu môže vykonať iba administrátor.');
+  return;
+ }
+
+ if(!confirm('Naozaj chcete odstrániť túto prihlášku z výstavy? Zvieratko zostane chovateľovi v jeho evidencii.')) return;
+
+ const {error:judgingError}=await db.from('judging')
+ .delete()
+ .eq('entry_id',entryId);
+
+ if(judgingError){
+  sprava('Chyba pri mazaní hodnotenia: '+judgingError.message);
+  return;
+ }
+
+ const {error}=await db.from('entries')
+ .delete()
+ .eq('id',entryId);
+
+ if(error){
+  sprava('Chyba pri mazaní prihlášky: '+error.message);
+  return;
+ }
+
+ sprava('Prihláška bola vymazaná. Zvieratko zostalo v evidencii chovateľa.');
+ await nacitajVsetkyPrihlasky();
+ await nacitajMojePrihlasky();
+ await nacitajVerejneVysledky();
 }
 
 async function ulozKlietku(id){
