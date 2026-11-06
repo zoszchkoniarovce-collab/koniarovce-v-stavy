@@ -182,7 +182,6 @@ function sprava(t){
  document.getElementById('sprava').textContent=t;
 }
 
-/* VEREJNE VYSLEDKY – PORADIE PODLA KATEGORIE A VYSTAVY */
 async function nacitajVerejneVysledky(){
  const box=document.getElementById('zoznamVerejnychVysledkov');
 
@@ -198,7 +197,6 @@ async function nacitajVerejneVysledky(){
  }
 
  box.innerHTML='';
-
  const dataRows=data||[];
 
  if(!dataRows.length){
@@ -210,7 +208,6 @@ async function nacitajVerejneVysledky(){
 
  poradie.forEach(kategoria=>{
   const categoryRows=dataRows.filter(r=>r.category===kategoria);
-
   if(!categoryRows.length) return;
 
   const categorySection=document.createElement('div');
@@ -631,6 +628,7 @@ async function vytvorVystavu(){
  await nacitajVystavy();
 }
 
+/* ADMIN – PRIHLASKY AJ S MENOM VYSTAVOVATELA */
 async function nacitajVsetkyPrihlasky(){
  const box=document.getElementById('vsetkyPrihlasky');
 
@@ -654,12 +652,29 @@ async function nacitajVsetkyPrihlasky(){
  const entryIds=entries.map(e=>e.id);
 
  const {data:animals,error:animalError}=await db.from('animals')
- .select('id,category,breed,animal_number,sex')
+ .select('id,owner_id,category,breed,animal_number,sex')
  .in('id',animalIds);
 
  if(animalError){
   box.textContent='Chyba pri načítaní zvierat: '+animalError.message;
   return;
+ }
+
+ const ownerIds=[...new Set((animals||[]).map(a=>a.owner_id).filter(Boolean))];
+
+ let profiles=[];
+
+ if(ownerIds.length){
+  const {data:profileData,error:profilesError}=await db.from('profiles')
+  .select('id,first_name,last_name')
+  .in('id',ownerIds);
+
+  if(profilesError){
+   box.textContent='Chyba pri načítaní vystavovateľov: '+profilesError.message;
+   return;
+  }
+
+  profiles=profileData||[];
  }
 
  const {data:hodnotenia,error:hodnotenieError}=await db.from('judging')
@@ -675,9 +690,16 @@ async function nacitajVsetkyPrihlasky(){
   const v=vystavy.find(x=>x.id===e.exhibition_id);
   const z=(animals||[]).find(a=>a.id===e.animal_id);
   const h=(hodnotenia||[]).find(x=>x.entry_id===e.id);
+  const p=(profiles||[]).find(x=>x.id===z?.owner_id);
+
+  const meno=[p?.first_name,p?.last_name].filter(Boolean).join(' ')||'Meno neuvedené';
 
   const d=document.createElement('div');
   d.className='entry';
+
+  const vystavovatel=document.createElement('h3');
+  vystavovatel.textContent='Vystavovateľ: '+meno;
+  d.appendChild(vystavovatel);
 
   const info=document.createElement('p');
   info.textContent=(v?.name||'Výstava')+' — '+(z?.category||'Zviera')+' — plemeno: '+(z?.breed||'neuvedené')+' — číslo zvieraťa: '+(z?.animal_number||'—')+' — pohlavie: '+(z?.sex||'—')+' — stav: '+(e.entry_status||'prijatá');
