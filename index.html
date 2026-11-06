@@ -58,6 +58,15 @@ label{display:block;margin-top:8px;font-weight:bold}
 <input id="emailPrih" type="email" placeholder="E-mail">
 <input id="hesloPrih" type="password" placeholder="Heslo">
 <button onclick="prihlasenie()">Prihlásiť sa</button>
+<button class="secondary" onclick="zabudnuteHeslo()">Zabudli ste heslo?</button>
+</div>
+
+<div id="obnovaPanel" class="card hidden">
+<h2>Obnovenie hesla</h2>
+<p>Zadajte nové heslo.</p>
+<input id="noveHeslo" type="password" placeholder="Nové heslo">
+<input id="noveHeslo2" type="password" placeholder="Zopakujte nové heslo">
+<button onclick="ulozNoveHeslo()">Uložiť nové heslo</button>
 </div>
 
 <div id="ucet" class="hidden">
@@ -72,31 +81,22 @@ label{display:block;margin-top:8px;font-weight:bold}
 <div class="card">
 <h2>Moje zvieratá</h2>
 <p>Pridajte si svoje zvieratá do evidencie.</p>
-
 <form id="formularZviera">
 <input type="hidden" id="zvieraId">
-
 <label>Kategória zvieraťa</label>
 <select id="kategoria" required>
 <option value="">Vyberte kategóriu</option>
-<option>Hydina</option>
-<option>Holuby</option>
-<option>Králiky</option>
+<option>Hydina</option><option>Holuby</option><option>Králiky</option>
 </select>
-
 <label>Plemeno</label>
 <input id="plemeno" required placeholder="Napr. Australorpka čierna">
-
 <label>Číslo zvieraťa</label>
 <input id="cislo" placeholder="Číslo zvieraťa">
-
 <label>Pohlavie</label>
 <select id="pohlavie">
 <option value="">Vyberte pohlavie</option>
-<option>Samec</option>
-<option>Samica</option>
+<option>Samec</option><option>Samica</option>
 </select>
-
 <button type="submit" id="ulozitBtn">Pridať zviera</button>
 <button type="button" class="secondary hidden" id="zrusitBtn" onclick="zrusitUpravu()">Zrušiť úpravu</button>
 </form>
@@ -127,40 +127,30 @@ label{display:block;margin-top:8px;font-weight:bold}
 </div>
 
 <div id="adminPanel" class="hidden">
-
 <div class="card">
 <h2>Správa výstav – administrátor</h2>
-
 <label>Názov výstavy</label>
 <input id="adminNazov" placeholder="Názov výstavy">
-
 <label>Miesto konania</label>
 <input id="adminMiesto" placeholder="Miesto konania">
-
 <label>Začiatok</label>
 <input id="adminOd" type="date">
-
 <label>Koniec</label>
 <input id="adminDo" type="date">
-
 <label>Uzávierka prihlášok</label>
 <input id="adminUzavierka" type="date">
-
 <button onclick="vytvorVystavu()">Vytvoriť výstavu</button>
 </div>
-
 <div class="card">
 <h2>Všetky prihlášky – administrátor</h2>
 <p>Tu môžete prideľovať klietky a zapisovať výsledky zvierat.</p>
 <div id="vsetkyPrihlasky">Načítavam všetky prihlášky...</div>
 </div>
-
 <div class="card">
 <h2>Zoznam vystavovateľov – kontakty</h2>
 <p>Prehľad registrovaných vystavovateľov zoradený abecedne podľa priezviska.</p>
 <div id="zoznamVystavovatelov">Načítavam vystavovateľov...</div>
 </div>
-
 </div>
 </div>
 
@@ -177,97 +167,9 @@ let mojeZvierata=[];
 let vystavy=[];
 let jeAdmin=false;
 
-const ocenenia=[
- 'Bez ocenenia',
- 'Víťaz výstavy',
- 'Čestná cena',
- 'Pohár starostu obce',
- 'Najkrajšie národné plemeno'
-];
+const ocenenia=['Bez ocenenia','Víťaz výstavy','Čestná cena','Pohár starostu obce','Najkrajšie národné plemeno'];
 
-function sprava(t){
- document.getElementById('sprava').textContent=t;
-}
-
-async function nacitajVerejneVysledky(){
- const box=document.getElementById('zoznamVerejnychVysledkov');
-
- const {data,error}=await db.from('public_results')
- .select('entry_id,exhibition_name,category,breed,animal_number,exhibitor,points,award')
- .not('points','is',null)
- .order('points',{ascending:false});
-
- if(error){
-  box.textContent='Výsledky sa nepodarilo načítať.';
-  console.error(error);
-  return;
- }
-
- box.innerHTML='';
- const dataRows=data||[];
-
- if(!dataRows.length){
-  box.textContent='Zatiaľ nie sú zverejnené žiadne ohodnotené zvieratá.';
-  return;
- }
-
- const poradie=['Hydina','Holuby','Králiky'];
-
- poradie.forEach(kategoria=>{
-  const categoryRows=dataRows.filter(r=>r.category===kategoria);
-  if(!categoryRows.length) return;
-
-  const categorySection=document.createElement('div');
-  categorySection.className='result';
-
-  const categoryHeading=document.createElement('h3');
-  categoryHeading.textContent=kategoria;
-  categorySection.appendChild(categoryHeading);
-
-  const nazvyVystav=[...new Set(
-   categoryRows.map(r=>r.exhibition_name||'Výstava bez názvu')
-  )];
-
-  nazvyVystav.forEach(nazovVystavy=>{
-   const exhibitionRows=categoryRows
-    .filter(r=>(r.exhibition_name||'Výstava bez názvu')===nazovVystavy)
-    .sort((a,b)=>Number(b.points)-Number(a.points));
-
-   const exhibitionBox=document.createElement('div');
-   exhibitionBox.className='entry';
-
-   const exhibitionHeading=document.createElement('h4');
-   exhibitionHeading.textContent=nazovVystavy;
-   exhibitionBox.appendChild(exhibitionHeading);
-
-   exhibitionRows.forEach((r,index)=>{
-    const item=document.createElement('div');
-    item.className='entry';
-
-    const title=document.createElement('strong');
-    title.textContent=(index+1)+'. miesto – '+(r.breed||'Plemeno neuvedené');
-    item.appendChild(title);
-
-    const details=document.createElement('p');
-    details.textContent=
-     'Vystavovateľ: '+(r.exhibitor||'Neuvedený')+
-     ' | Číslo zvieraťa: '+(r.animal_number||'—');
-    item.appendChild(details);
-
-    const score=document.createElement('p');
-    score.textContent='Body: '+r.points+
-     (r.award?' | Ocenenie: '+r.award:'');
-    item.appendChild(score);
-
-    exhibitionBox.appendChild(item);
-   });
-
-   categorySection.appendChild(exhibitionBox);
-  });
-
-  box.appendChild(categorySection);
- });
-}
+function sprava(t){document.getElementById('sprava').textContent=t;}
 
 function zobrazUcet(user){
  prihlasenyPouzivatel=user;
@@ -277,26 +179,27 @@ function zobrazUcet(user){
  if(user) inicializujUcet();
 }
 
-async function inicializujUcet(){
- await zistiRolu();
- await nacitajZvierata();
- await nacitajVystavy();
- await nacitajMojePrihlasky();
-
- if(jeAdmin){
-  await nacitajVsetkyPrihlasky();
-  await nacitajVystavovatelov();
- }
+async function zabudnuteHeslo(){
+ const email=document.getElementById('emailPrih').value.trim();
+ if(!email){sprava('Najskôr zadajte svoj e-mail do prihlasovacieho poľa.');return;}
+ const {error}=await db.auth.resetPasswordForEmail(email,{
+  redirectTo:window.location.origin+window.location.pathname
+ });
+ if(error){sprava('Chyba: '+error.message);return;}
+ sprava('Odkaz na obnovenie hesla bol odoslaný. Skontrolujte si e-mail.');
 }
 
-async function zistiRolu(){
- const {data,error}=await db.from('profiles')
- .select('role')
- .eq('id',prihlasenyPouzivatel.id)
- .maybeSingle();
-
- jeAdmin=!error&&data?.role==='admin';
- document.getElementById('adminPanel').classList.toggle('hidden',!jeAdmin);
+async function ulozNoveHeslo(){
+ const h=document.getElementById('noveHeslo').value;
+ const h2=document.getElementById('noveHeslo2').value;
+ if(h.length<6){sprava('Heslo musí mať aspoň 6 znakov.');return;}
+ if(h!==h2){sprava('Heslá sa nezhodujú.');return;}
+ const {error}=await db.auth.updateUser({password:h});
+ if(error){sprava('Chyba pri zmene hesla: '+error.message);return;}
+ sprava('Heslo bolo úspešne zmenené. Teraz sa môžete prihlásiť.');
+ document.getElementById('obnovaPanel').classList.add('hidden');
+ document.getElementById('uvod').classList.remove('hidden');
+ await db.auth.signOut();
 }
 
 async function registracia(){
@@ -306,22 +209,8 @@ async function registracia(){
  const telefon=document.getElementById('telefon').value.trim();
  const adresa=document.getElementById('adresa').value.trim();
  const heslo=document.getElementById('hesloReg').value;
-
- if(!meno||!priezvisko||!email||!heslo){
-  sprava('Vyplňte meno, priezvisko, e-mail a heslo.');
-  return;
- }
-
- const {error}=await db.auth.signUp({
-  email,password:heslo,
-  options:{data:{
-   first_name:meno,
-   last_name:priezvisko,
-   phone:telefon,
-   address:adresa
-  }}
- });
-
+ if(!meno||!priezvisko||!email||!heslo){sprava('Vyplňte meno, priezvisko, e-mail a heslo.');return;}
+ const {error}=await db.auth.signUp({email,password:heslo,options:{data:{first_name:meno,last_name:priezvisko,phone:telefon,address:adresa}}});
  sprava(error?'Chyba registrácie: '+error.message:'Registrácia prebehla. Skontrolujte si e-mail, ak je potrebné potvrdenie.');
 }
 
@@ -329,101 +218,73 @@ async function prihlasenie(){
  const email=document.getElementById('emailPrih').value.trim();
  const password=document.getElementById('hesloPrih').value;
  const {error}=await db.auth.signInWithPassword({email,password});
- if(error) sprava('Chyba prihlásenia: '+error.message);
+ if(error)sprava('Chyba prihlásenia: '+error.message);
  else sprava('Úspešne ste sa prihlásili.');
 }
 
-async function odhlasenie(){
- await db.auth.signOut();
- sprava('Boli ste odhlásený.');
+async function odhlasenie(){await db.auth.signOut();sprava('Boli ste odhlásený.');}
+
+async function inicializujUcet(){
+ await zistiRolu();await nacitajZvierata();await nacitajVystavy();await nacitajMojePrihlasky();
+ if(jeAdmin){await nacitajVsetkyPrihlasky();await nacitajVystavovatelov();}
+}
+
+async function zistiRolu(){
+ const {data,error}=await db.from('profiles').select('role').eq('id',prihlasenyPouzivatel.id).maybeSingle();
+ jeAdmin=!error&&data?.role==='admin';
+ document.getElementById('adminPanel').classList.toggle('hidden',!jeAdmin);
+}
+
+async function nacitajVerejneVysledky(){
+ const box=document.getElementById('zoznamVerejnychVysledkov');
+ const {data,error}=await db.from('public_results').select('entry_id,exhibition_name,category,breed,animal_number,exhibitor,points,award').not('points','is',null).order('points',{ascending:false});
+ if(error){box.textContent='Výsledky sa nepodarilo načítať.';return;}
+ box.innerHTML='';
+ if(!data?.length){box.textContent='Zatiaľ nie sú zverejnené žiadne ohodnotené zvieratá.';return;}
+ const poradie=['Hydina','Holuby','Králiky'];
+ poradie.forEach(k=>{
+  const rows=data.filter(r=>r.category===k);
+  if(!rows.length)return;
+  const section=document.createElement('div');section.className='result';
+  const heading=document.createElement('h3');heading.textContent=k;section.appendChild(heading);
+  [...new Set(rows.map(r=>r.exhibition_name||'Výstava bez názvu'))].forEach(n=>{
+   const sub=document.createElement('div');sub.className='entry';
+   const h=document.createElement('h4');h.textContent=n;sub.appendChild(h);
+   rows.filter(r=>(r.exhibition_name||'Výstava bez názvu')===n).forEach((r,i)=>{
+    const item=document.createElement('p');
+    item.textContent=(i+1)+'. '+(r.breed||'Plemeno neuvedené')+' | Vystavovateľ: '+(r.exhibitor||'Neuvedený')+' | Číslo: '+(r.animal_number||'—')+' | Body: '+r.points+' | '+(r.award||'');
+    sub.appendChild(item);
+   });
+   section.appendChild(sub);
+  });
+  box.appendChild(section);
+ });
 }
 
 async function nacitajZvierata(){
  const zoznam=document.getElementById('zoznamZvierat');
- zoznam.textContent='Načítavam...';
-
- const {data,error}=await db.from('animals')
- .select('id,category,breed,animal_number,sex,created_at')
- .eq('owner_id',prihlasenyPouzivatel.id)
- .order('created_at',{ascending:false});
-
- if(error){
-  zoznam.textContent='Chyba pri načítaní: '+error.message;
-  return;
- }
-
- mojeZvierata=data||[];
- zoznam.innerHTML='';
-
- if(!data.length){
-  zoznam.textContent='Zatiaľ nemáte pridané žiadne zvieratá.';
- }
-
+ const {data,error}=await db.from('animals').select('id,category,breed,animal_number,sex,created_at').eq('owner_id',prihlasenyPouzivatel.id).order('created_at',{ascending:false});
+ if(error){zoznam.textContent='Chyba: '+error.message;return;}
+ mojeZvierata=data||[];zoznam.innerHTML='';
+ if(!data?.length)zoznam.textContent='Zatiaľ nemáte pridané žiadne zvieratá.';
  data.forEach(z=>{
-  const div=document.createElement('div');
-  div.className='animal';
-
-  const b=document.createElement('strong');
-  b.textContent=z.category+' – '+z.breed;
-  div.appendChild(b);
-
-  const p=document.createElement('p');
-  p.textContent='Číslo: '+(z.animal_number||'—')+' | Pohlavie: '+(z.sex||'—');
-  div.appendChild(p);
-
-  const u=document.createElement('button');
-  u.textContent='Upraviť';
-  u.onclick=()=>upravZviera(z);
-  div.appendChild(u);
-
-  const d=document.createElement('button');
-  d.textContent='Vymazať';
-  d.className='delete';
-  d.onclick=()=>vymazZviera(z.id);
-  div.appendChild(d);
-
-  zoznam.appendChild(div);
+  const d=document.createElement('div');d.className='animal';
+  const b=document.createElement('strong');b.textContent=z.category+' – '+z.breed;d.appendChild(b);
+  const p=document.createElement('p');p.textContent='Číslo: '+(z.animal_number||'—')+' | Pohlavie: '+(z.sex||'—');d.appendChild(p);
+  const u=document.createElement('button');u.textContent='Upraviť';u.onclick=()=>upravZviera(z);d.appendChild(u);
+  const del=document.createElement('button');del.textContent='Vymazať';del.className='delete';del.onclick=()=>vymazZviera(z.id);d.appendChild(del);
+  zoznam.appendChild(d);
  });
-
  naplnVyberZviera();
 }
 
 document.getElementById('formularZviera').addEventListener('submit',async e=>{
  e.preventDefault();
-
- if(!prihlasenyPouzivatel){
-  sprava('Najskôr sa prihláste.');
-  return;
- }
-
  const id=document.getElementById('zvieraId').value;
-
- const z={
-  category:document.getElementById('kategoria').value,
-  breed:document.getElementById('plemeno').value.trim(),
-  animal_number:document.getElementById('cislo').value.trim(),
-  sex:document.getElementById('pohlavie').value
- };
-
- let r;
-
- if(id){
-  r=await db.from('animals')
-  .update(z).eq('id',id)
-  .eq('owner_id',prihlasenyPouzivatel.id);
- }else{
-  r=await db.from('animals')
-  .insert({...z,owner_id:prihlasenyPouzivatel.id});
- }
-
- if(r.error){
-  sprava('Chyba pri ukladaní: '+r.error.message);
-  return;
- }
-
- sprava(id?'Zviera bolo upravené.':'Zviera bolo pridané.');
- zrusitUpravu();
- await nacitajZvierata();
+ const z={category:document.getElementById('kategoria').value,breed:document.getElementById('plemeno').value.trim(),animal_number:document.getElementById('cislo').value.trim(),sex:document.getElementById('pohlavie').value};
+ const r=id?await db.from('animals').update(z).eq('id',id).eq('owner_id',prihlasenyPouzivatel.id):await db.from('animals').insert({...z,owner_id:prihlasenyPouzivatel.id});
+ if(r.error){sprava('Chyba pri ukladaní: '+r.error.message);return;}
+ sprava(id?'Zviera bolo upravené.':'Zviera bolo pridané.');zrusitUpravu();await nacitajZvierata();
 });
 
 function upravZviera(z){
@@ -434,590 +295,165 @@ function upravZviera(z){
  document.getElementById('pohlavie').value=z.sex||'';
  document.getElementById('ulozitBtn').textContent='Uložiť zmeny';
  document.getElementById('zrusitBtn').classList.remove('hidden');
- document.getElementById('formularZviera').scrollIntoView({behavior:'smooth'});
 }
-
 function zrusitUpravu(){
  document.getElementById('formularZviera').reset();
  document.getElementById('zvieraId').value='';
  document.getElementById('ulozitBtn').textContent='Pridať zviera';
  document.getElementById('zrusitBtn').classList.add('hidden');
 }
-
 async function vymazZviera(id){
- if(!confirm('Naozaj chcete vymazať toto zviera?')) return;
-
- const {error}=await db.from('animals')
- .delete().eq('id',id)
- .eq('owner_id',prihlasenyPouzivatel.id);
-
- if(error){
-  sprava('Chyba pri mazaní: '+error.message);
-  return;
- }
-
- sprava('Zviera bolo vymazané.');
- await nacitajZvierata();
+ if(!confirm('Naozaj chcete vymazať toto zviera?'))return;
+ const {error}=await db.from('animals').delete().eq('id',id).eq('owner_id',prihlasenyPouzivatel.id);
+ if(error){sprava('Chyba: '+error.message);return;}
+ sprava('Zviera bolo vymazané.');await nacitajZvierata();
 }
 
 async function nacitajVystavy(){
- const {data,error}=await db.from('exhibitions')
- .select('id,name,location,start_date,end_date,registration_deadline,status')
- .order('start_date',{ascending:true});
-
- const box=document.getElementById('zoznamVystav');
- const sel=document.getElementById('vyberVystavy');
- box.innerHTML='';
- sel.innerHTML='<option value="">Vyberte výstavu</option>';
-
- if(error){
-  box.textContent='Chyba pri načítaní výstav: '+error.message;
-  return;
- }
-
+ const {data,error}=await db.from('exhibitions').select('id,name,location,start_date,end_date,registration_deadline,status').order('start_date',{ascending:true});
+ const box=document.getElementById('zoznamVystav'),sel=document.getElementById('vyberVystavy');
+ box.innerHTML='';sel.innerHTML='<option value="">Vyberte výstavu</option>';
+ if(error){box.textContent='Chyba: '+error.message;return;}
  vystavy=data||[];
-
- if(!vystavy.length){
-  box.textContent='Momentálne nie sú vytvorené žiadne výstavy.';
- }
-
+ if(!vystavy.length)box.textContent='Momentálne nie sú vytvorené žiadne výstavy.';
  vystavy.forEach(v=>{
-  const d=document.createElement('div');
-  d.className='exhibition';
-
-  const b=document.createElement('strong');
-  b.textContent=v.name;
-  d.appendChild(b);
-
-  const p=document.createElement('p');
-  p.textContent=(v.location||'Miesto neurčené')+' | '+(v.start_date||'')+' – '+(v.end_date||'')+' | Uzávierka: '+(v.registration_deadline||'')+' | '+(v.status||'');
-  d.appendChild(p);
-
-  if(jeAdmin){
-   const deleteButton=document.createElement('button');
-   deleteButton.textContent='Vymazať výstavu';
-   deleteButton.className='delete';
-   deleteButton.onclick=()=>vymazVystavu(v.id,v.name);
-   d.appendChild(deleteButton);
-  }
-
+  const d=document.createElement('div');d.className='exhibition';
+  const b=document.createElement('strong');b.textContent=v.name;d.appendChild(b);
+  const p=document.createElement('p');p.textContent=(v.location||'Miesto neurčené')+' | '+(v.start_date||'')+' – '+(v.end_date||'')+' | Uzávierka: '+(v.registration_deadline||'')+' | '+(v.status||'');d.appendChild(p);
+  if(jeAdmin){const del=document.createElement('button');del.textContent='Vymazať výstavu';del.className='delete';del.onclick=()=>vymazVystavu(v.id,v.name);d.appendChild(del);}
   box.appendChild(d);
-
-  const o=document.createElement('option');
-  o.value=v.id;
-  o.textContent=v.name+' ('+(v.start_date||'')+')';
-  sel.appendChild(o);
+  const o=document.createElement('option');o.value=v.id;o.textContent=v.name+' ('+(v.start_date||'')+')';sel.appendChild(o);
  });
 }
-
 async function vymazVystavu(id,nazov){
- if(!jeAdmin){
-  sprava('Túto akciu môže vykonať iba administrátor.');
-  return;
+ if(!jeAdmin||!confirm('Naozaj vymazať výstavu '+nazov+' vrátane prihlášok a hodnotení?'))return;
+ const {data:entries,error:ee}=await db.from('entries').select('id').eq('exhibition_id',id);
+ if(ee){sprava(ee.message);return;}
+ const ids=(entries||[]).map(e=>e.id);
+ if(ids.length){
+  const {error:e1}=await db.from('judging').delete().in('entry_id',ids);if(e1){sprava(e1.message);return;}
+  const {error:e2}=await db.from('entries').delete().eq('exhibition_id',id);if(e2){sprava(e2.message);return;}
  }
-
- if(!confirm('Naozaj chcete vymazať výstavu "'+nazov+'" vrátane všetkých jej prihlášok a hodnotení?')) return;
-
- const {data:entries,error:entriesError}=await db.from('entries')
- .select('id')
- .eq('exhibition_id',id);
-
- if(entriesError){
-  sprava('Chyba pri načítaní prihlášok výstavy: '+entriesError.message);
-  return;
- }
-
- const entryIds=(entries||[]).map(e=>e.id);
-
- if(entryIds.length){
-  const {error:judgingError}=await db.from('judging')
-  .delete()
-  .in('entry_id',entryIds);
-
-  if(judgingError){
-   sprava('Chyba pri mazaní hodnotení: '+judgingError.message);
-   return;
-  }
-
-  const {error:deleteEntriesError}=await db.from('entries')
-  .delete()
-  .eq('exhibition_id',id);
-
-  if(deleteEntriesError){
-   sprava('Chyba pri mazaní prihlášok: '+deleteEntriesError.message);
-   return;
-  }
- }
-
- const {error}=await db.from('exhibitions')
- .delete()
- .eq('id',id);
-
- if(error){
-  sprava('Chyba pri mazaní výstavy: '+error.message);
-  return;
- }
-
- sprava('Výstava a jej prihlášky boli vymazané.');
- await nacitajVystavy();
- await nacitajMojePrihlasky();
- await nacitajVsetkyPrihlasky();
- await nacitajVerejneVysledky();
+ const {error}=await db.from('exhibitions').delete().eq('id',id);
+ if(error){sprava(error.message);return;}
+ sprava('Výstava bola vymazaná.');await nacitajVystavy();await nacitajMojePrihlasky();await nacitajVsetkyPrihlasky();await nacitajVerejneVysledky();
 }
-
 function naplnVyberZviera(){
- const sel=document.getElementById('vyberZviera');
- sel.innerHTML='<option value="">Vyberte zviera</option>';
-
- mojeZvierata.forEach(z=>{
-  const o=document.createElement('option');
-  o.value=z.id;
-  o.textContent=z.category+' – '+z.breed+' – '+(z.animal_number||'bez čísla');
-  sel.appendChild(o);
- });
+ const sel=document.getElementById('vyberZviera');sel.innerHTML='<option value="">Vyberte zviera</option>';
+ mojeZvierata.forEach(z=>{const o=document.createElement('option');o.value=z.id;o.textContent=z.category+' – '+z.breed+' – '+(z.animal_number||'bez čísla');sel.appendChild(o);});
 }
-
 async function prihlasZviera(){
- const exhibition_id=document.getElementById('vyberVystavy').value;
- const animal_id=document.getElementById('vyberZviera').value;
-
- if(!exhibition_id||!animal_id){
-  sprava('Vyberte výstavu aj zviera.');
-  return;
- }
-
- const {error}=await db.from('entries').insert({
-  exhibition_id,animal_id
- });
-
- if(error){
-  sprava('Chyba pri prihlasovaní: '+error.message);
-  return;
- }
-
+ const exhibition_id=document.getElementById('vyberVystavy').value,animal_id=document.getElementById('vyberZviera').value;
+ if(!exhibition_id||!animal_id){sprava('Vyberte výstavu aj zviera.');return;}
+ const {error}=await db.from('entries').insert({exhibition_id,animal_id});
+ if(error){sprava('Chyba pri prihlasovaní: '+error.message);return;}
  sprava('Zviera bolo úspešne prihlásené na výstavu.');
- await nacitajMojePrihlasky();
- if(jeAdmin) await nacitajVsetkyPrihlasky();
+ await nacitajMojePrihlasky();if(jeAdmin)await nacitajVsetkyPrihlasky();
 }
-
 async function nacitajMojePrihlasky(){
  const box=document.getElementById('mojePrihlasky');
-
- const {data,error}=await db.from('entries')
- .select('id,exhibition_id,animal_id,cage_number,entry_status,created_at')
- .order('created_at',{ascending:false});
-
- if(error){
-  box.textContent='Chyba pri načítaní prihlášok: '+error.message;
-  return;
- }
-
+ const {data,error}=await db.from('entries').select('id,exhibition_id,animal_id,cage_number,entry_status,created_at').order('created_at',{ascending:false});
+ if(error){box.textContent='Chyba: '+error.message;return;}
  box.innerHTML='';
-
- const moje=(data||[]).filter(e=>
-  mojeZvierata.some(z=>z.id===e.animal_id)
- );
-
- if(!moje.length){
-  box.textContent='Zatiaľ nemáte žiadne prihlášky.';
-  return;
- }
-
- const entryIds=moje.map(e=>e.id);
- const {data:hodnotenia,error:hodnotenieError}=await db.from('judging')
- .select('entry_id,points,award,notes')
- .in('entry_id',entryIds);
-
- if(hodnotenieError){
-  box.textContent='Chyba pri načítaní hodnotení: '+hodnotenieError.message;
-  return;
- }
-
+ const moje=(data||[]).filter(e=>mojeZvierata.some(z=>z.id===e.animal_id));
+ if(!moje.length){box.textContent='Zatiaľ nemáte žiadne prihlášky.';return;}
+ const ids=moje.map(e=>e.id);
+ const {data:hs,error:he}=await db.from('judging').select('entry_id,points,award,notes').in('entry_id',ids);
+ if(he){box.textContent=he.message;return;}
  moje.forEach(e=>{
-  const v=vystavy.find(x=>x.id===e.exhibition_id);
-  const z=mojeZvierata.find(x=>x.id===e.animal_id);
-  const h=(hodnotenia||[]).find(x=>x.entry_id===e.id);
-
-  const d=document.createElement('div');
-  d.className='entry';
-
-  const info=document.createElement('strong');
-  info.textContent=(v?.name||'Výstava');
-  d.appendChild(info);
-
-  const p=document.createElement('p');
-  p.textContent=(z?.category||'Zviera')+' — '+(z?.breed||'')+' — číslo: '+(z?.animal_number||'—')+' — klietka: '+(e.cage_number||'zatiaľ nepridelená')+' — stav: '+(e.entry_status||'prijatá');
-  d.appendChild(p);
-
-  const result=document.createElement('div');
-  result.className='result';
-
-  const title=document.createElement('strong');
-  title.textContent='Hodnotenie zvieraťa';
-  result.appendChild(title);
-
-  const points=document.createElement('p');
-  points.textContent='Počet bodov: '+(h?.points??'Zatiaľ nehodnotené');
-  result.appendChild(points);
-
-  const award=document.createElement('p');
-  award.textContent='Ocenenie: '+(h?.award||'—');
-  result.appendChild(award);
-
-  const notes=document.createElement('p');
-  notes.textContent='Poznámka: '+(h?.notes||'—');
-  result.appendChild(notes);
-
-  d.appendChild(result);
-  box.appendChild(d);
+  const v=vystavy.find(x=>x.id===e.exhibition_id),z=mojeZvierata.find(x=>x.id===e.animal_id),h=(hs||[]).find(x=>x.entry_id===e.id);
+  const d=document.createElement('div');d.className='entry';
+  const b=document.createElement('strong');b.textContent=v?.name||'Výstava';d.appendChild(b);
+  const p=document.createElement('p');p.textContent=(z?.category||'Zviera')+' — '+(z?.breed||'')+' — číslo: '+(z?.animal_number||'—')+' — klietka: '+(e.cage_number||'zatiaľ nepridelená')+' — stav: '+(e.entry_status||'prijatá');d.appendChild(p);
+  const r=document.createElement('div');r.className='result';
+  const t=document.createElement('strong');t.textContent='Hodnotenie zvieraťa';r.appendChild(t);
+  ['Počet bodov: '+(h?.points??'Zatiaľ nehodnotené'),'Ocenenie: '+(h?.award||'—'),'Poznámka: '+(h?.notes||'—')].forEach(x=>{const q=document.createElement('p');q.textContent=x;r.appendChild(q);});
+  d.appendChild(r);box.appendChild(d);
  });
 }
 
 async function vytvorVystavu(){
- const name=document.getElementById('adminNazov').value.trim();
- const location=document.getElementById('adminMiesto').value.trim();
- const start_date=document.getElementById('adminOd').value;
- const end_date=document.getElementById('adminDo').value;
- const registration_deadline=document.getElementById('adminUzavierka').value;
-
- if(!name||!start_date||!end_date){
-  sprava('Vyplňte názov, začiatok a koniec výstavy.');
-  return;
- }
-
- const {error}=await db.from('exhibitions').insert({
-  name,location,start_date,end_date,registration_deadline,status:'Otvorená'
- });
-
- if(error){
-  sprava('Chyba pri vytváraní výstavy: '+error.message);
-  return;
- }
-
- sprava('Výstava bola vytvorená.');
- document.getElementById('adminNazov').value='';
- document.getElementById('adminMiesto').value='';
- document.getElementById('adminOd').value='';
- document.getElementById('adminDo').value='';
- document.getElementById('adminUzavierka').value='';
- await nacitajVystavy();
+ const name=document.getElementById('adminNazov').value.trim(),location=document.getElementById('adminMiesto').value.trim(),start_date=document.getElementById('adminOd').value,end_date=document.getElementById('adminDo').value,registration_deadline=document.getElementById('adminUzavierka').value;
+ if(!name||!start_date||!end_date){sprava('Vyplňte názov, začiatok a koniec výstavy.');return;}
+ const {error}=await db.from('exhibitions').insert({name,location,start_date,end_date,registration_deadline,status:'Otvorená'});
+ if(error){sprava(error.message);return;}
+ sprava('Výstava bola vytvorená.');['adminNazov','adminMiesto','adminOd','adminDo','adminUzavierka'].forEach(id=>document.getElementById(id).value='');await nacitajVystavy();
 }
 
 async function nacitajVsetkyPrihlasky(){
  const box=document.getElementById('vsetkyPrihlasky');
-
- const {data:entries,error}=await db.from('entries')
- .select('id,exhibition_id,animal_id,cage_number,entry_status,created_at')
- .order('created_at',{ascending:false});
-
- if(error){
-  box.textContent='Chyba pri načítaní prihlášok: '+error.message;
-  return;
- }
-
- box.innerHTML='';
-
- if(!entries?.length){
-  box.textContent='Zatiaľ nie sú žiadne prihlášky.';
-  return;
- }
-
- const animalIds=[...new Set(entries.map(e=>e.animal_id))];
- const entryIds=entries.map(e=>e.id);
-
- const {data:animals,error:animalError}=await db.from('animals')
- .select('id,owner_id,category,breed,animal_number,sex')
- .in('id',animalIds);
-
- if(animalError){
-  box.textContent='Chyba pri načítaní zvierat: '+animalError.message;
-  return;
- }
-
+ const {data:entries,error}=await db.from('entries').select('id,exhibition_id,animal_id,cage_number,entry_status,created_at').order('created_at',{ascending:false});
+ if(error){box.textContent=error.message;return;}
+ box.innerHTML='';if(!entries?.length){box.textContent='Zatiaľ nie sú žiadne prihlášky.';return;}
+ const animalIds=[...new Set(entries.map(e=>e.animal_id))],entryIds=entries.map(e=>e.id);
+ const {data:animals,error:ae}=await db.from('animals').select('id,owner_id,category,breed,animal_number,sex').in('id',animalIds);
+ if(ae){box.textContent=ae.message;return;}
  const ownerIds=[...new Set((animals||[]).map(a=>a.owner_id).filter(Boolean))];
-
  let profiles=[];
-
- if(ownerIds.length){
-  const {data:profileData,error:profilesError}=await db.from('profiles')
-  .select('id,first_name,last_name')
-  .in('id',ownerIds);
-
-  if(profilesError){
-   box.textContent='Chyba pri načítaní vystavovateľov: '+profilesError.message;
-   return;
-  }
-
-  profiles=profileData||[];
- }
-
- const {data:hodnotenia,error:hodnotenieError}=await db.from('judging')
- .select('id,entry_id,points,award,notes')
- .in('entry_id',entryIds);
-
- if(hodnotenieError){
-  box.textContent='Chyba pri načítaní hodnotení: '+hodnotenieError.message;
-  return;
- }
-
+ if(ownerIds.length){const {data,error}=await db.from('profiles').select('id,first_name,last_name').in('id',ownerIds);if(error){box.textContent=error.message;return;}profiles=data||[];}
+ const {data:hs,error:he}=await db.from('judging').select('id,entry_id,points,award,notes').in('entry_id',entryIds);
+ if(he){box.textContent=he.message;return;}
  entries.forEach(e=>{
-  const v=vystavy.find(x=>x.id===e.exhibition_id);
-  const z=(animals||[]).find(a=>a.id===e.animal_id);
-  const h=(hodnotenia||[]).find(x=>x.entry_id===e.id);
-  const p=(profiles||[]).find(x=>x.id===z?.owner_id);
-
+  const v=vystavy.find(x=>x.id===e.exhibition_id),z=(animals||[]).find(a=>a.id===e.animal_id),h=(hs||[]).find(x=>x.entry_id===e.id),p=(profiles||[]).find(x=>x.id===z?.owner_id);
   const meno=[p?.first_name,p?.last_name].filter(Boolean).join(' ')||'Meno neuvedené';
-
-  const d=document.createElement('div');
-  d.className='entry';
-
-  const vystavovatel=document.createElement('h3');
-  vystavovatel.textContent='Vystavovateľ: '+meno;
-  d.appendChild(vystavovatel);
-
-  const info=document.createElement('p');
-  info.textContent=(v?.name||'Výstava')+' — '+(z?.category||'Zviera')+' — plemeno: '+(z?.breed||'neuvedené')+' — číslo zvieraťa: '+(z?.animal_number||'—')+' — pohlavie: '+(z?.sex||'—')+' — stav: '+(e.entry_status||'prijatá');
-  d.appendChild(info);
-
-  const cageLabel=document.createElement('label');
-  cageLabel.textContent='Číslo klietky';
-  d.appendChild(cageLabel);
-
-  const cageInput=document.createElement('input');
-  cageInput.type='text';
-  cageInput.placeholder='Zadajte číslo klietky';
-  cageInput.value=e.cage_number||'';
-  cageInput.id='klietka-'+e.id;
-  d.appendChild(cageInput);
-
-  const cageButton=document.createElement('button');
-  cageButton.textContent='Uložiť číslo klietky';
-  cageButton.onclick=()=>ulozKlietku(e.id);
-  d.appendChild(cageButton);
-
-  const divider=document.createElement('hr');
-  d.appendChild(divider);
-
-  const resultTitle=document.createElement('h3');
-  resultTitle.textContent='Hodnotenie zvieraťa';
-  d.appendChild(resultTitle);
-
-  const pointsLabel=document.createElement('label');
-  pointsLabel.textContent='Počet bodov';
-  d.appendChild(pointsLabel);
-
-  const pointsInput=document.createElement('input');
-  pointsInput.type='number';
-  pointsInput.min='0';
-  pointsInput.step='0.5';
-  pointsInput.placeholder='Zadajte počet bodov';
-  pointsInput.value=h?.points??'';
-  pointsInput.id='body-'+e.id;
-  d.appendChild(pointsInput);
-
-  const awardLabel=document.createElement('label');
-  awardLabel.textContent='Ocenenie';
-  d.appendChild(awardLabel);
-
-  const awardSelect=document.createElement('select');
-  awardSelect.id='ocenenie-'+e.id;
-
-  ocenenia.forEach(o=>{
-   const option=document.createElement('option');
-   option.value=o==='Bez ocenenia'?'':o;
-   option.textContent=o;
-   awardSelect.appendChild(option);
-  });
-
-  awardSelect.value=h?.award||'';
-  d.appendChild(awardSelect);
-
-  const notesLabel=document.createElement('label');
-  notesLabel.textContent='Poznámka k hodnoteniu';
-  d.appendChild(notesLabel);
-
-  const notesInput=document.createElement('input');
-  notesInput.type='text';
-  notesInput.placeholder='Poznámka rozhodcu';
-  notesInput.value=h?.notes||'';
-  notesInput.id='poznamka-'+e.id;
-  d.appendChild(notesInput);
-
-  const saveButton=document.createElement('button');
-  saveButton.textContent='Uložiť hodnotenie';
-  saveButton.onclick=()=>ulozHodnotenie(e.id);
-  d.appendChild(saveButton);
-
-  const status=document.createElement('p');
-  status.textContent=h?'Hodnotenie je uložené.':'Zatiaľ bez hodnotenia.';
-  d.appendChild(status);
-
-  const deleteEntryButton=document.createElement('button');
-  deleteEntryButton.textContent='Vymazať prihlášku';
-  deleteEntryButton.className='delete';
-  deleteEntryButton.onclick=()=>vymazPrihlasku(e.id);
-  d.appendChild(deleteEntryButton);
-
-  const idInfo=document.createElement('small');
-  idInfo.textContent='ID prihlášky: '+e.id+' | Klietka: '+(e.cage_number||'nepridelená');
-  d.appendChild(idInfo);
-
+  const d=document.createElement('div');d.className='entry';
+  const title=document.createElement('h3');title.textContent='Vystavovateľ: '+meno;d.appendChild(title);
+  const info=document.createElement('p');info.textContent=(v?.name||'Výstava')+' — '+(z?.category||'Zviera')+' — plemeno: '+(z?.breed||'neuvedené')+' — číslo: '+(z?.animal_number||'—')+' — pohlavie: '+(z?.sex||'—')+' — stav: '+(e.entry_status||'prijatá');d.appendChild(info);
+  const cl=document.createElement('label');cl.textContent='Číslo klietky';d.appendChild(cl);
+  const ci=document.createElement('input');ci.value=e.cage_number||'';ci.id='klietka-'+e.id;ci.placeholder='Zadajte číslo klietky';d.appendChild(ci);
+  const cb=document.createElement('button');cb.textContent='Uložiť číslo klietky';cb.onclick=()=>ulozKlietku(e.id);d.appendChild(cb);
+  const hr=document.createElement('hr');d.appendChild(hr);
+  const rt=document.createElement('h3');rt.textContent='Hodnotenie zvieraťa';d.appendChild(rt);
+  const pl=document.createElement('label');pl.textContent='Počet bodov';d.appendChild(pl);
+  const pi=document.createElement('input');pi.type='number';pi.min='0';pi.step='0.5';pi.value=h?.points??'';pi.id='body-'+e.id;d.appendChild(pi);
+  const al=document.createElement('label');al.textContent='Ocenenie';d.appendChild(al);
+  const as=document.createElement('select');as.id='ocenenie-'+e.id;
+  ocenenia.forEach(o=>{const op=document.createElement('option');op.value=o==='Bez ocenenia'?'':o;op.textContent=o;as.appendChild(op);});
+  as.value=h?.award||'';d.appendChild(as);
+  const nl=document.createElement('label');nl.textContent='Poznámka k hodnoteniu';d.appendChild(nl);
+  const ni=document.createElement('input');ni.placeholder='Poznámka rozhodcu';ni.value=h?.notes||'';ni.id='poznamka-'+e.id;d.appendChild(ni);
+  const sb=document.createElement('button');sb.textContent='Uložiť hodnotenie';sb.onclick=()=>ulozHodnotenie(e.id);d.appendChild(sb);
+  const status=document.createElement('p');status.textContent=h?'Hodnotenie je uložené.':'Zatiaľ bez hodnotenia.';d.appendChild(status);
+  const del=document.createElement('button');del.textContent='Vymazať prihlášku';del.className='delete';del.onclick=()=>vymazPrihlasku(e.id);d.appendChild(del);
   box.appendChild(d);
  });
 }
-
 async function nacitajVystavovatelov(){
  const box=document.getElementById('zoznamVystavovatelov');
-
- if(!jeAdmin){
-  box.textContent='Túto sekciu môže vidieť iba administrátor.';
-  return;
- }
-
- box.textContent='Načítavam vystavovateľov...';
-
- const {data,error}=await db.from('profiles')
- .select('first_name,last_name,email,phone,address')
- .order('last_name',{ascending:true})
- .order('first_name',{ascending:true});
-
- if(error){
-  box.textContent='Chyba pri načítaní vystavovateľov: '+error.message;
-  return;
- }
-
+ if(!jeAdmin){box.textContent='Túto sekciu môže vidieť iba administrátor.';return;}
+ const {data,error}=await db.from('profiles').select('first_name,last_name,email,phone,address').order('last_name',{ascending:true}).order('first_name',{ascending:true});
+ if(error){box.textContent=error.message;return;}
  box.innerHTML='';
-
- if(!data||!data.length){
-  box.textContent='Zatiaľ nie sú registrovaní žiadni vystavovatelia.';
-  return;
- }
-
- data.forEach((p,index)=>{
-  const d=document.createElement('div');
-  d.className='entry';
-
-  const name=document.createElement('strong');
-  name.textContent=(index+1)+'. '+([p.first_name,p.last_name].filter(Boolean).join(' ')||'Meno neuvedené');
-  d.appendChild(name);
-
-  const email=document.createElement('p');
-  email.textContent='E-mail: '+(p.email||'Neuvedený');
-  d.appendChild(email);
-
-  const phone=document.createElement('p');
-  phone.textContent='Telefón: '+(p.phone||'Neuvedený');
-  d.appendChild(phone);
-
-  const address=document.createElement('p');
-  address.textContent='Adresa: '+(p.address||'Neuvedená');
-  d.appendChild(address);
-
+ if(!data?.length){box.textContent='Zatiaľ nie sú registrovaní žiadni vystavovatelia.';return;}
+ data.forEach((p,i)=>{
+  const d=document.createElement('div');d.className='entry';
+  const n=document.createElement('strong');n.textContent=(i+1)+'. '+([p.first_name,p.last_name].filter(Boolean).join(' ')||'Meno neuvedené');d.appendChild(n);
+  ['E-mail: '+(p.email||'Neuvedený'),'Telefón: '+(p.phone||'Neuvedený'),'Adresa: '+(p.address||'Neuvedená')].forEach(x=>{const q=document.createElement('p');q.textContent=x;d.appendChild(q);});
   box.appendChild(d);
  });
 }
-
-async function vymazPrihlasku(entryId){
- if(!jeAdmin){
-  sprava('Túto akciu môže vykonať iba administrátor.');
-  return;
- }
-
- if(!confirm('Naozaj chcete odstrániť túto prihlášku z výstavy? Zvieratko zostane chovateľovi v jeho evidencii.')) return;
-
- const {error:judgingError}=await db.from('judging')
- .delete()
- .eq('entry_id',entryId);
-
- if(judgingError){
-  sprava('Chyba pri mazaní hodnotenia: '+judgingError.message);
-  return;
- }
-
- const {error}=await db.from('entries')
- .delete()
- .eq('id',entryId);
-
- if(error){
-  sprava('Chyba pri mazaní prihlášky: '+error.message);
-  return;
- }
-
- sprava('Prihláška bola vymazaná. Zvieratko zostalo v evidencii chovateľa.');
- await nacitajVsetkyPrihlasky();
- await nacitajMojePrihlasky();
- await nacitajVerejneVysledky();
+async function vymazPrihlasku(id){
+ if(!jeAdmin||!confirm('Naozaj odstrániť túto prihlášku? Zvieratko zostane v evidencii.'))return;
+ const {error:he}=await db.from('judging').delete().eq('entry_id',id);if(he){sprava(he.message);return;}
+ const {error}=await db.from('entries').delete().eq('id',id);if(error){sprava(error.message);return;}
+ sprava('Prihláška bola vymazaná.');await nacitajVsetkyPrihlasky();await nacitajMojePrihlasky();await nacitajVerejneVysledky();
 }
-
 async function ulozKlietku(id){
- const input=document.getElementById('klietka-'+id);
- const cage_number=input.value.trim();
-
- const {error}=await db.from('entries')
- .update({cage_number:cage_number||null})
- .eq('id',id);
-
- if(error){
-  sprava('Chyba pri ukladaní čísla klietky: '+error.message);
-  return;
- }
-
- sprava('Číslo klietky bolo uložené.');
- await nacitajVsetkyPrihlasky();
- await nacitajMojePrihlasky();
+ const cage_number=document.getElementById('klietka-'+id).value.trim();
+ const {error}=await db.from('entries').update({cage_number:cage_number||null}).eq('id',id);
+ if(error){sprava(error.message);return;}
+ sprava('Číslo klietky bolo uložené.');await nacitajVsetkyPrihlasky();await nacitajMojePrihlasky();
 }
-
-async function ulozHodnotenie(entryId){
- const pointsValue=document.getElementById('body-'+entryId).value;
- const award=document.getElementById('ocenenie-'+entryId).value;
- const notes=document.getElementById('poznamka-'+entryId).value.trim();
-
- const points=pointsValue===''?null:Number(pointsValue);
-
- if(points!==null&&(!Number.isFinite(points)||points<0)){
-  sprava('Zadajte platný počet bodov.');
-  return;
- }
-
- const hodnotenie={
-  entry_id:entryId,
-  points,
-  award:award||null,
-  notes:notes||null
- };
-
- const {data:existujuce,error:selectError}=await db.from('judging')
- .select('id')
- .eq('entry_id',entryId)
- .maybeSingle();
-
- if(selectError){
-  sprava('Chyba pri kontrole hodnotenia: '+selectError.message);
-  return;
- }
-
- let error;
-
- if(existujuce){
-  const vysledok=await db.from('judging')
-  .update(hodnotenie)
-  .eq('id',existujuce.id);
-  error=vysledok.error;
- }else{
-  const vysledok=await db.from('judging')
-  .insert(hodnotenie);
-  error=vysledok.error;
- }
-
- if(error){
-  sprava('Chyba pri ukladaní hodnotenia: '+error.message);
-  return;
- }
-
- sprava('Hodnotenie bolo úspešne uložené.');
- await nacitajVsetkyPrihlasky();
- await nacitajMojePrihlasky();
- await nacitajVerejneVysledky();
+async function ulozHodnotenie(id){
+ const val=document.getElementById('body-'+id).value,award=document.getElementById('ocenenie-'+id).value,notes=document.getElementById('poznamka-'+id).value.trim();
+ const points=val===''?null:Number(val);
+ if(points!==null&&(!Number.isFinite(points)||points<0)){sprava('Zadajte platný počet bodov.');return;}
+ const obj={entry_id:id,points,award:award||null,notes:notes||null};
+ const {data:old,error:se}=await db.from('judging').select('id').eq('entry_id',id).maybeSingle();
+ if(se){sprava(se.message);return;}
+ const res=old?await db.from('judging').update(obj).eq('id',old.id):await db.from('judging').insert(obj);
+ if(res.error){sprava(res.error.message);return;}
+ sprava('Hodnotenie bolo úspešne uložené.');await nacitajVsetkyPrihlasky();await nacitajMojePrihlasky();await nacitajVerejneVysledky();
 }
 
 nacitajVerejneVysledky();
@@ -1026,10 +462,14 @@ db.auth.getSession().then(({data})=>{
  zobrazUcet(data.session?.user||null);
 });
 
-db.auth.onAuthStateChange((_event,session)=>{
+db.auth.onAuthStateChange((event,session)=>{
+ if(event==='PASSWORD_RECOVERY'){
+  document.getElementById('uvod').classList.add('hidden');
+  document.getElementById('ucet').classList.add('hidden');
+  document.getElementById('obnovaPanel').classList.remove('hidden');
+ }
  zobrazUcet(session?.user||null);
 });
 </script>
-
 </body>
 </html>
