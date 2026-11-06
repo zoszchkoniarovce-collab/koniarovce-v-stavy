@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="sk">
 <head>
@@ -21,6 +22,8 @@ button{border:0;background:#287345;color:white;font-weight:bold;cursor:pointer}
 #sprava{padding:10px;color:#245b38;overflow-wrap:anywhere}
 label{display:block;margin-top:8px;font-weight:bold}
 .result{background:#f0f6f1;padding:12px;border-radius:8px;margin-top:10px}
+.support{background:#eaf3ec;border-radius:8px;padding:14px;margin-top:12px}
+.support a{color:#245b38;font-weight:bold;text-decoration:none}
 </style>
 </head>
 <body>
@@ -31,6 +34,15 @@ label{display:block;margin-top:8px;font-weight:bold}
 </header>
 
 <main>
+
+<div class="card">
+<h2>Technická podpora</h2>
+<p>Máte problém s prihlásením alebo aplikáciou? Kontaktujte administrátora.</p>
+<div class="support">
+<strong>Chalányi David</strong><br>
+<a href="tel:0917723020">Telefón: 0917 723 020</a>
+</div>
+</div>
 
 <div class="card" id="verejneVysledky">
 <h2>Výsledky výstav</h2>
@@ -161,6 +173,9 @@ label{display:block;margin-top:8px;font-weight:bold}
 <label>Uzávierka prihlášok</label>
 <input id="adminUzavierka" type="date">
 
+<label>Cena katalógu za 1 kus (€)</label>
+<input id="adminCenaKatalogu" type="number" min="0" step="0.01" value="0">
+
 <button onclick="vytvorVystavu()">Vytvoriť výstavu</button>
 </div>
 
@@ -209,13 +224,10 @@ function sprava(t){
 async function nacitajPoplatok(){
  const {data,error}=await db.from('app_settings')
   .select('entry_fee').eq('id',1).maybeSingle();
- if(error){
-  console.error('Chyba pri načítaní poplatku:',error);
-  return;
- }
+ if(error){console.error(error);return;}
  const cena=Number(data?.entry_fee??1);
  const pole=document.getElementById('adminPoplatok');
- if(pole) pole.value=cena.toFixed(2);
+ if(pole)pole.value=cena.toFixed(2);
 }
 
 async function ulozPoplatok(){
@@ -242,7 +254,7 @@ async function nacitajVerejneVysledky(){
 
  if(error){
   box.textContent='Výsledky sa nepodarilo načítať.';
-  console.error('Chyba verejných výsledkov:',error);
+  console.error(error);
   return;
  }
  box.innerHTML='';
@@ -294,7 +306,7 @@ function zobrazUcet(user){
  document.getElementById('uvod').classList.toggle('hidden',!!user);
  document.getElementById('ucet').classList.toggle('hidden',!user);
  document.getElementById('pouzivatel').textContent=user?user.email:'';
- if(user) inicializujUcet();
+ if(user)inicializujUcet();
 }
 
 async function inicializujUcet(){
@@ -303,7 +315,7 @@ async function inicializujUcet(){
  await nacitajZvierata();
  await nacitajVystavy();
  await nacitajMojePrihlasky();
- if(jeAdmin) await nacitajVsetkyPrihlasky();
+ if(jeAdmin)await nacitajVsetkyPrihlasky();
 }
 
 async function zistiRolu(){
@@ -429,26 +441,100 @@ async function vymazZviera(id){
  sprava('Zviera bolo vymazané.');await nacitajZvierata();
 }
 
+/* VYSTAVY */
 async function nacitajVystavy(){
  const {data,error}=await db.from('exhibitions')
- .select('id,name,location,start_date,end_date,registration_deadline,status')
+ .select('id,name,location,start_date,end_date,registration_deadline,status,catalog_price')
  .order('start_date',{ascending:true});
  const box=document.getElementById('zoznamVystav');
  const sel=document.getElementById('vyberVystavy');
- box.innerHTML='';sel.innerHTML='<option value="">Vyberte výstavu</option>';
+ box.innerHTML='';
+ sel.innerHTML='<option value="">Vyberte výstavu</option>';
  if(error){box.textContent='Chyba pri načítaní výstav: '+error.message;return;}
  vystavy=data||[];
  if(!vystavy.length)box.textContent='Momentálne nie sú vytvorené žiadne výstavy.';
+
  vystavy.forEach(v=>{
   const d=document.createElement('div');d.className='exhibition';
   const b=document.createElement('strong');b.textContent=v.name;d.appendChild(b);
   const p=document.createElement('p');
-  p.textContent=(v.location||'Miesto neurčené')+' | '+(v.start_date||'')+' – '+(v.end_date||'')+' | Uzávierka: '+(v.registration_deadline||'')+' | '+(v.status||'');
-  d.appendChild(p);box.appendChild(d);
-  const o=document.createElement('option');o.value=v.id;o.textContent=v.name+' ('+(v.start_date||'')+')';sel.appendChild(o);
+  p.textContent=(v.location||'Miesto neurčené')+' | '+(v.start_date||'')+' – '+(v.end_date||'')+' | Uzávierka: '+(v.registration_deadline||'')+' | Stav: '+(v.status||'Otvorená');
+  d.appendChild(p);
+
+  const cena=document.createElement('p');
+  cena.textContent='Cena katalógu za 1 kus: '+Number(v.catalog_price||0).toFixed(2)+' €';
+  d.appendChild(cena);
+
+  if(jeAdmin){
+   if(v.status!=='Zrušená'){
+    const cancel=document.createElement('button');
+    cancel.textContent='Zrušiť výstavu';
+    cancel.className='delete';
+    cancel.onclick=()=>zrusVystavu(v.id,v.name);
+    d.appendChild(cancel);
+   }else{
+    const cancelled=document.createElement('p');
+    cancelled.textContent='Táto výstava bola zrušená.';
+    cancelled.style.color='#a83232';
+    cancelled.style.fontWeight='bold';
+    d.appendChild(cancelled);
+   }
+  }
+
+  box.appendChild(d);
+
+  if(v.status!=='Zrušená'){
+   const o=document.createElement('option');
+   o.value=v.id;
+   o.textContent=v.name+' ('+(v.start_date||'')+')';
+   sel.appendChild(o);
+  }
  });
 }
 
+async function zrusVystavu(id,nazov){
+ if(!jeAdmin){sprava('Túto akciu môže vykonať iba administrátor.');return;}
+ if(!confirm('Naozaj chcete zrušiť výstavu „'+nazov+'“? Prihlášky a výsledky zostanú zachované.'))return;
+ const {error}=await db.from('exhibitions')
+  .update({status:'Zrušená'}).eq('id',id);
+ if(error){sprava('Výstavu sa nepodarilo zrušiť: '+error.message);return;}
+ sprava('Výstava bola označená ako zrušená.');
+ await nacitajVystavy();
+}
+
+async function vytvorVystavu(){
+ if(!jeAdmin){sprava('Výstavu môže vytvoriť iba administrátor.');return;}
+ const name=document.getElementById('adminNazov').value.trim();
+ const location=document.getElementById('adminMiesto').value.trim();
+ const start_date=document.getElementById('adminOd').value;
+ const end_date=document.getElementById('adminDo').value;
+ const registration_deadline=document.getElementById('adminUzavierka').value;
+ const catalog_price=Number(document.getElementById('adminCenaKatalogu').value||0);
+
+ if(!name||!start_date||!end_date){
+  sprava('Vyplňte názov, začiatok a koniec výstavy.');return;
+ }
+ if(!Number.isFinite(catalog_price)||catalog_price<0){
+  sprava('Zadajte platnú cenu katalógu.');return;
+ }
+
+ const {error}=await db.from('exhibitions').insert({
+  name,location,start_date,end_date,registration_deadline,
+  catalog_price,status:'Otvorená'
+ });
+ if(error){sprava('Chyba pri vytváraní výstavy: '+error.message);return;}
+
+ sprava('Výstava bola vytvorená.');
+ document.getElementById('adminNazov').value='';
+ document.getElementById('adminMiesto').value='';
+ document.getElementById('adminOd').value='';
+ document.getElementById('adminDo').value='';
+ document.getElementById('adminUzavierka').value='';
+ document.getElementById('adminCenaKatalogu').value='0';
+ await nacitajVystavy();
+}
+
+/* VYBER ZVIERAT */
 function naplnVyberZviera(){
  const sel=document.getElementById('vyberZviera');
  sel.innerHTML='<option value="">Vyberte zviera</option>';
@@ -463,6 +549,12 @@ async function prihlasZviera(){
  const exhibition_id=document.getElementById('vyberVystavy').value;
  const animal_id=document.getElementById('vyberZviera').value;
  if(!exhibition_id||!animal_id){sprava('Vyberte výstavu aj zviera.');return;}
+
+ const vybrana=vystavy.find(v=>v.id===exhibition_id);
+ if(!vybrana||vybrana.status==='Zrušená'){
+  sprava('Na zrušenú výstavu nie je možné prihlasovať zvieratá.');return;
+ }
+
  const {error}=await db.from('entries').insert({exhibition_id,animal_id});
  if(error){sprava('Chyba pri prihlasovaní: '+error.message);return;}
  sprava('Zviera bolo úspešne prihlásené na výstavu.');
@@ -474,6 +566,9 @@ async function ukoncitPrihlasku(){
  const exhibition_id=document.getElementById('vyberVystavy').value;
  if(!exhibition_id){sprava('Najskôr vyberte výstavu v časti Prihlásiť zviera na výstavu.');return;}
  const vystava=vystavy.find(v=>v.id===exhibition_id);
+ if(!vystava||vystava.status==='Zrušená'){
+  sprava('Táto výstava je zrušená.');return;
+ }
  if(!confirm('Odoslať potvrdenie prihlášky na výstavu „'+(vystava?.name||'')+'“ na váš e-mail?'))return;
  sprava('Odosielam potvrdenie, chvíľu počkajte...');
  const {data,error}=await db.functions.invoke('odoslat-potvrdenie',{body:{exhibition_id}});
@@ -487,6 +582,7 @@ async function ukoncitPrihlasku(){
  sprava(data?.message||'Potvrdenie prihlášky bolo odoslané na váš e-mail. Celkový poplatok: '+Number(data?.celkovyPoplatok||0).toFixed(2)+' €.');
 }
 
+/* MOJE PRIHLASKY */
 async function nacitajMojePrihlasky(){
  const box=document.getElementById('mojePrihlasky');
  const {data,error}=await db.from('entries')
@@ -518,24 +614,7 @@ async function nacitajMojePrihlasky(){
  });
 }
 
-async function vytvorVystavu(){
- const name=document.getElementById('adminNazov').value.trim();
- const location=document.getElementById('adminMiesto').value.trim();
- const start_date=document.getElementById('adminOd').value;
- const end_date=document.getElementById('adminDo').value;
- const registration_deadline=document.getElementById('adminUzavierka').value;
- if(!name||!start_date||!end_date){sprava('Vyplňte názov, začiatok a koniec výstavy.');return;}
- const {error}=await db.from('exhibitions').insert({name,location,start_date,end_date,registration_deadline,status:'Otvorená'});
- if(error){sprava('Chyba pri vytváraní výstavy: '+error.message);return;}
- sprava('Výstava bola vytvorená.');
- document.getElementById('adminNazov').value='';
- document.getElementById('adminMiesto').value='';
- document.getElementById('adminOd').value='';
- document.getElementById('adminDo').value='';
- document.getElementById('adminUzavierka').value='';
- await nacitajVystavy();
-}
-
+/* ADMIN PRIHLASKY */
 async function nacitajVsetkyPrihlasky(){
  const box=document.getElementById('vsetkyPrihlasky');
  const {data:entries,error}=await db.from('entries')
@@ -552,6 +631,7 @@ async function nacitajVsetkyPrihlasky(){
  const {data:hodnotenia,error:hodnotenieError}=await db.from('judging')
  .select('id,entry_id,points,award,notes').in('entry_id',entryIds);
  if(hodnotenieError){box.textContent='Chyba pri načítaní hodnotení: '+hodnotenieError.message;return;}
+
  entries.forEach(e=>{
   const v=vystavy.find(x=>x.id===e.exhibition_id);
   const z=(animals||[]).find(a=>a.id===e.animal_id);
