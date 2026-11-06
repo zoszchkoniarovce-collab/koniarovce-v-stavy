@@ -25,15 +25,25 @@ label{display:block;margin-top:8px;font-weight:bold}
 </style>
 </head>
 <body>
+
 <header>
 <h1>ZO SZCH KONIAROVCE</h1>
 <p>Výstavný systém</p>
 </header>
+
 <main>
+
+<!-- VEREJNE VYSLEDKY -->
+<div class="card" id="verejneVysledky">
+<h2>Výsledky výstav</h2>
+<p>Oficiálne výsledky výstav zvierat.</p>
+<div id="zoznamVerejnychVysledkov">Načítavam výsledky...</div>
+</div>
 
 <div id="uvod" class="card">
 <h2>Vitajte na výstave</h2>
 <p>Vytvorte si účet vystavovateľa alebo sa prihláste.</p>
+
 <h3>Registrácia</h3>
 <input id="meno" placeholder="Meno">
 <input id="priezvisko" placeholder="Priezvisko">
@@ -42,7 +52,9 @@ label{display:block;margin-top:8px;font-weight:bold}
 <input id="adresa" placeholder="Adresa">
 <input id="hesloReg" type="password" placeholder="Heslo">
 <button onclick="registracia()">Vytvoriť účet</button>
+
 <hr>
+
 <h3>Prihlásenie</h3>
 <input id="emailPrih" type="email" placeholder="E-mail">
 <input id="hesloPrih" type="password" placeholder="Heslo">
@@ -50,6 +62,7 @@ label{display:block;margin-top:8px;font-weight:bold}
 </div>
 
 <div id="ucet" class="hidden">
+
 <div class="card">
 <h2>Moje konto</h2>
 <p>Prihlásený používateľ:</p>
@@ -60,8 +73,10 @@ label{display:block;margin-top:8px;font-weight:bold}
 <div class="card">
 <h2>Moje zvieratá</h2>
 <p>Pridajte si svoje zvieratá do evidencie.</p>
+
 <form id="formularZviera">
 <input type="hidden" id="zvieraId">
+
 <label>Kategória zvieraťa</label>
 <select id="kategoria" required>
 <option value="">Vyberte kategóriu</option>
@@ -69,16 +84,20 @@ label{display:block;margin-top:8px;font-weight:bold}
 <option>Holuby</option>
 <option>Králiky</option>
 </select>
+
 <label>Plemeno</label>
 <input id="plemeno" required placeholder="Napr. Australorpka čierna">
+
 <label>Číslo zvieraťa</label>
 <input id="cislo" placeholder="Číslo zvieraťa">
+
 <label>Pohlavie</label>
 <select id="pohlavie">
 <option value="">Vyberte pohlavie</option>
 <option>Samec</option>
 <option>Samica</option>
 </select>
+
 <button type="submit" id="ulozitBtn">Pridať zviera</button>
 <button type="button" class="secondary hidden" id="zrusitBtn" onclick="zrusitUpravu()">Zrušiť úpravu</button>
 </form>
@@ -109,18 +128,25 @@ label{display:block;margin-top:8px;font-weight:bold}
 </div>
 
 <div id="adminPanel" class="hidden">
+
 <div class="card">
 <h2>Správa výstav – administrátor</h2>
+
 <label>Názov výstavy</label>
 <input id="adminNazov" placeholder="Názov výstavy">
+
 <label>Miesto konania</label>
 <input id="adminMiesto" placeholder="Miesto konania">
+
 <label>Začiatok</label>
 <input id="adminOd" type="date">
+
 <label>Koniec</label>
 <input id="adminDo" type="date">
+
 <label>Uzávierka prihlášok</label>
 <input id="adminUzavierka" type="date">
+
 <button onclick="vytvorVystavu()">Vytvoriť výstavu</button>
 </div>
 
@@ -129,6 +155,7 @@ label{display:block;margin-top:8px;font-weight:bold}
 <p>Tu môžete prideľovať klietky a zapisovať výsledky zvierat.</p>
 <div id="vsetkyPrihlasky">Načítavam všetky prihlášky...</div>
 </div>
+
 </div>
 </div>
 
@@ -155,6 +182,71 @@ const ocenenia=[
 
 function sprava(t){
  document.getElementById('sprava').textContent=t;
+}
+
+/* VEREJNE VYSLEDKY */
+async function nacitajVerejneVysledky(){
+ const box=document.getElementById('zoznamVerejnychVysledkov');
+
+ const {data,error}=await db.from('public_results')
+ .select('entry_id,exhibition_name,category,breed,animal_number,exhibitor,points,award')
+ .not('points','is',null)
+ .order('points',{ascending:false});
+
+ if(error){
+  box.textContent='Výsledky sa nepodarilo načítať.';
+  console.error('Chyba verejných výsledkov:',error);
+  return;
+ }
+
+ box.innerHTML='';
+
+ const dataRows=data||[];
+
+ if(!dataRows.length){
+  box.textContent='Zatiaľ nie sú zverejnené žiadne ohodnotené zvieratá.';
+  return;
+ }
+
+ const poradie=['Hydina','Holuby','Králiky'];
+
+ poradie.forEach(kategoria=>{
+  const rows=dataRows.filter(r=>r.category===kategoria);
+
+  if(!rows.length) return;
+
+  const section=document.createElement('div');
+  section.className='result';
+
+  const heading=document.createElement('h3');
+  heading.textContent=kategoria;
+  section.appendChild(heading);
+
+  rows.forEach((r,index)=>{
+   const item=document.createElement('div');
+   item.className='entry';
+
+   const title=document.createElement('strong');
+   title.textContent=(index+1)+'. miesto – '+(r.breed||'Plemeno neuvedené');
+   item.appendChild(title);
+
+   const details=document.createElement('p');
+   details.textContent=
+    'Výstava: '+(r.exhibition_name||'—')+
+    ' | Vystavovateľ: '+(r.exhibitor||'Neuvedený')+
+    ' | Číslo zvieraťa: '+(r.animal_number||'—');
+   item.appendChild(details);
+
+   const score=document.createElement('p');
+   score.textContent='Body: '+r.points+
+    (r.award?' | Ocenenie: '+r.award:'');
+   item.appendChild(score);
+
+   section.appendChild(item);
+  });
+
+  box.appendChild(section);
+ });
 }
 
 function zobrazUcet(user){
@@ -724,7 +816,10 @@ async function ulozHodnotenie(entryId){
  sprava('Hodnotenie bolo úspešne uložené.');
  await nacitajVsetkyPrihlasky();
  await nacitajMojePrihlasky();
+ nacitajVerejneVysledky();
 }
+
+nacitajVerejneVysledky();
 
 db.auth.getSession().then(({data})=>{
  zobrazUcet(data.session?.user||null);
@@ -734,5 +829,6 @@ db.auth.onAuthStateChange((_event,session)=>{
  zobrazUcet(session?.user||null);
 });
 </script>
+
 </body>
 </html>
