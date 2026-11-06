@@ -25,24 +25,20 @@ async function ukoncitPrihlasku(){
  }
 
  if(!vystava){
-  sprava('Výstava sa nenašla. Obnovte stránku a skúste znova.');
+  sprava('Výstava sa nenašla.');
   return;
  }
 
- const stav=String(vystava.status||'')
-  .trim()
-  .toLowerCase();
+ const stav=String(vystava.status||'').trim().toLowerCase();
 
  if(stav==='zrušená'||stav==='zrusena'){
   sprava('Táto výstava je zrušená.');
   return;
  }
 
- if(!confirm('Odoslať potvrdenie prihlášky na výstavu „'+vystava.name+'“ na váš e-mail?')){
-  return;
- }
+ if(!confirm('Odoslať potvrdenie prihlášky na výstavu „'+vystava.name+'“ na váš e-mail?'))return;
 
- sprava('Odosielam potvrdenie, chvíľu počkajte...');
+ sprava('Odosielam potvrdenie...');
 
  const {data,error}=await db.functions.invoke(
   'odoslat-potvrdenie',
@@ -59,9 +55,5 @@ async function ukoncitPrihlasku(){
   return;
  }
 
- sprava(
-  data?.message||
-  'Potvrdenie prihlášky bolo odoslané na váš e-mail. Celkový poplatok: '+
-  Number(data?.celkovyPoplatok||0).toFixed(2)+' €.'
- );
+ sprava(data?.message||'Potvrdenie bolo odoslané na váš e-mail.');
 }
