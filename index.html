@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="sk">
 <head>
@@ -33,7 +32,6 @@ label{display:block;margin-top:8px;font-weight:bold}
 
 <main>
 
-<!-- VEREJNE VYSLEDKY -->
 <div class="card" id="verejneVysledky">
 <h2>Výsledky výstav</h2>
 <p>Oficiálne výsledky výstav zvierat.</p>
@@ -184,7 +182,7 @@ function sprava(t){
  document.getElementById('sprava').textContent=t;
 }
 
-/* VEREJNE VYSLEDKY */
+/* VEREJNE VYSLEDKY – PORADIE PODLA KATEGORIE A VYSTAVY */
 async function nacitajVerejneVysledky(){
  const box=document.getElementById('zoznamVerejnychVysledkov');
 
@@ -211,41 +209,59 @@ async function nacitajVerejneVysledky(){
  const poradie=['Hydina','Holuby','Králiky'];
 
  poradie.forEach(kategoria=>{
-  const rows=dataRows.filter(r=>r.category===kategoria);
+  const categoryRows=dataRows.filter(r=>r.category===kategoria);
 
-  if(!rows.length) return;
+  if(!categoryRows.length) return;
 
-  const section=document.createElement('div');
-  section.className='result';
+  const categorySection=document.createElement('div');
+  categorySection.className='result';
 
-  const heading=document.createElement('h3');
-  heading.textContent=kategoria;
-  section.appendChild(heading);
+  const categoryHeading=document.createElement('h3');
+  categoryHeading.textContent=kategoria;
+  categorySection.appendChild(categoryHeading);
 
-  rows.forEach((r,index)=>{
-   const item=document.createElement('div');
-   item.className='entry';
+  const nazvyVystav=[...new Set(
+   categoryRows.map(r=>r.exhibition_name||'Výstava bez názvu')
+  )];
 
-   const title=document.createElement('strong');
-   title.textContent=(index+1)+'. miesto – '+(r.breed||'Plemeno neuvedené');
-   item.appendChild(title);
+  nazvyVystav.forEach(nazovVystavy=>{
+   const exhibitionRows=categoryRows
+    .filter(r=>(r.exhibition_name||'Výstava bez názvu')===nazovVystavy)
+    .sort((a,b)=>Number(b.points)-Number(a.points));
 
-   const details=document.createElement('p');
-   details.textContent=
-    'Výstava: '+(r.exhibition_name||'—')+
-    ' | Vystavovateľ: '+(r.exhibitor||'Neuvedený')+
-    ' | Číslo zvieraťa: '+(r.animal_number||'—');
-   item.appendChild(details);
+   const exhibitionBox=document.createElement('div');
+   exhibitionBox.className='entry';
 
-   const score=document.createElement('p');
-   score.textContent='Body: '+r.points+
-    (r.award?' | Ocenenie: '+r.award:'');
-   item.appendChild(score);
+   const exhibitionHeading=document.createElement('h4');
+   exhibitionHeading.textContent=nazovVystavy;
+   exhibitionBox.appendChild(exhibitionHeading);
 
-   section.appendChild(item);
+   exhibitionRows.forEach((r,index)=>{
+    const item=document.createElement('div');
+    item.className='entry';
+
+    const title=document.createElement('strong');
+    title.textContent=(index+1)+'. miesto – '+(r.breed||'Plemeno neuvedené');
+    item.appendChild(title);
+
+    const details=document.createElement('p');
+    details.textContent=
+     'Vystavovateľ: '+(r.exhibitor||'Neuvedený')+
+     ' | Číslo zvieraťa: '+(r.animal_number||'—');
+    item.appendChild(details);
+
+    const score=document.createElement('p');
+    score.textContent='Body: '+r.points+
+     (r.award?' | Ocenenie: '+r.award:'');
+    item.appendChild(score);
+
+    exhibitionBox.appendChild(item);
+   });
+
+   categorySection.appendChild(exhibitionBox);
   });
 
-  box.appendChild(section);
+  box.appendChild(categorySection);
  });
 }
 
@@ -816,7 +832,7 @@ async function ulozHodnotenie(entryId){
  sprava('Hodnotenie bolo úspešne uložené.');
  await nacitajVsetkyPrihlasky();
  await nacitajMojePrihlasky();
- nacitajVerejneVysledky();
+ await nacitajVerejneVysledky();
 }
 
 nacitajVerejneVysledky();
