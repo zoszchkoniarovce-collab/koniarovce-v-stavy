@@ -103,6 +103,9 @@ label{display:block;margin-top:8px;font-weight:bold}
 <option>Samica</option>
 </select>
 
+<label>Farba</label>
+<input id="farba" type="text" placeholder="Zadajte farbu zvieraťa">
+
 <button type="submit" id="ulozitBtn">Pridať zviera</button>
 <button type="button" class="secondary hidden" id="zrusitBtn" onclick="zrusitUpravu()">Zrušiť úpravu</button>
 </form>
@@ -361,7 +364,7 @@ async function nacitajZvierata(){
  const zoznam=document.getElementById('zoznamZvierat');
  zoznam.textContent='Načítavam...';
  const {data,error}=await db.from('animals')
- .select('id,category,breed,animal_number,sex,created_at')
+ .select('id,category,breed,animal_number,sex,color,created_at')
  .eq('owner_id',prihlasenyPouzivatel.id)
  .order('created_at',{ascending:false});
  if(error){zoznam.textContent='Chyba pri načítaní: '+error.message;return;}
@@ -371,7 +374,9 @@ async function nacitajZvierata(){
  mojeZvierata.forEach(z=>{
   const div=document.createElement('div');div.className='animal';
   const b=document.createElement('strong');b.textContent=z.category+' – '+z.breed;div.appendChild(b);
-  const p=document.createElement('p');p.textContent='Číslo: '+(z.animal_number||'—')+' | Pohlavie: '+(z.sex||'—');div.appendChild(p);
+  const p=document.createElement('p');
+  p.textContent='Číslo: '+(z.animal_number||'—')+' | Pohlavie: '+(z.sex||'—')+' | Farba: '+(z.color||'—');
+  div.appendChild(p);
   const u=document.createElement('button');u.textContent='Upraviť';u.onclick=()=>upravZviera(z);div.appendChild(u);
   const d=document.createElement('button');d.textContent='Vymazať';d.className='delete';d.onclick=()=>vymazZviera(z.id);div.appendChild(d);
   zoznam.appendChild(div);
@@ -387,7 +392,8 @@ document.getElementById('formularZviera').addEventListener('submit',async e=>{
   category:document.getElementById('kategoria').value,
   breed:document.getElementById('plemeno').value.trim(),
   animal_number:document.getElementById('cislo').value.trim(),
-  sex:document.getElementById('pohlavie').value
+  sex:document.getElementById('pohlavie').value,
+  color:document.getElementById('farba').value.trim()
  };
  let r;
  if(id)r=await db.from('animals').update(z).eq('id',id).eq('owner_id',prihlasenyPouzivatel.id);
@@ -403,6 +409,7 @@ function upravZviera(z){
  document.getElementById('plemeno').value=z.breed||'';
  document.getElementById('cislo').value=z.animal_number||'';
  document.getElementById('pohlavie').value=z.sex||'';
+ document.getElementById('farba').value=z.color||'';
  document.getElementById('ulozitBtn').textContent='Uložiť zmeny';
  document.getElementById('zrusitBtn').classList.remove('hidden');
  document.getElementById('formularZviera').scrollIntoView({behavior:'smooth'});
@@ -540,7 +547,7 @@ async function nacitajVsetkyPrihlasky(){
  const animalIds=[...new Set(entries.map(e=>e.animal_id))];
  const entryIds=entries.map(e=>e.id);
  const {data:animals,error:animalError}=await db.from('animals')
- .select('id,category,breed,animal_number,sex').in('id',animalIds);
+ .select('id,category,breed,animal_number,sex,color').in('id',animalIds);
  if(animalError){box.textContent='Chyba pri načítaní zvierat: '+animalError.message;return;}
  const {data:hodnotenia,error:hodnotenieError}=await db.from('judging')
  .select('id,entry_id,points,award,notes').in('entry_id',entryIds);
@@ -551,7 +558,7 @@ async function nacitajVsetkyPrihlasky(){
   const h=(hodnotenia||[]).find(x=>x.entry_id===e.id);
   const d=document.createElement('div');d.className='entry';
   const info=document.createElement('p');
-  info.textContent=(v?.name||'Výstava')+' — '+(z?.category||'Zviera')+' — plemeno: '+(z?.breed||'neuvedené')+' — číslo zvieraťa: '+(z?.animal_number||'—')+' — pohlavie: '+(z?.sex||'—')+' — stav: '+(e.entry_status||'prijatá');
+  info.textContent=(v?.name||'Výstava')+' — '+(z?.category||'Zviera')+' — plemeno: '+(z?.breed||'neuvedené')+' — číslo zvieraťa: '+(z?.animal_number||'—')+' — pohlavie: '+(z?.sex||'—')+' — farba: '+(z?.color||'—')+' — stav: '+(e.entry_status||'prijatá');
   d.appendChild(info);
   const cageLabel=document.createElement('label');cageLabel.textContent='Číslo klietky';d.appendChild(cageLabel);
   const cageInput=document.createElement('input');cageInput.type='text';cageInput.placeholder='Zadajte číslo klietky';cageInput.value=e.cage_number||'';cageInput.id='klietka-'+e.id;d.appendChild(cageInput);
