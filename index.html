@@ -4,7 +4,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
@@ -13,206 +14,148 @@ serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  if (req.method !== "POST") {
-    return Response.json(
-      { error: "Method not allowed." },
-      { status: 405, headers: corsHeaders }
-    );
-  }
-
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const resendKey = Deno.env.get("RESEND_API_KEY");
 
-    const supabase = createClient(supabaseUrl, serviceKey);
+    if (!resendKey) {
+      throw new Error("Chýba RESEND_API_KEY.");
+    }
 
-    const token = req.headers.get("Authorization");
+    const authorization = req.headers.get("Authorization");
 
-    if (!token) {
-      return Response.json(
-        { error: "Chýba prihlásenie." },
-        { status: 401, headers: corsHeaders }
-      );
+    if (!authorization) {
+      throw new Error("Používateľ nie je prihlásený.");
     }
 
     const userClient = createClient(supabaseUrl, anonKey, {
       global: {
-        headers: { Authorization: token },
+        headers: { Authorization: authorization },
       },
     });
 
-    const { data: authData, error: authError } =
-      await userClient.auth.getUser();
+    const {
+      data: { user },
+      error: userError,
+    } = await userClient.auth.getUser();
 
-    if (authError || !authData.user) {
-      return Response.json(
-        { error: "Neplatné prihlásenie." },
-        { status: 401, headers: corsHeaders }
-      );
+    if (userError || !user || !user.email) {
+      throw new Error("Nepodarilo sa overiť používateľa.");
     }
 
-    const userId = authData.user.id;
-    const email = authData.user.email;
-
-    if (!email) {
-      return Response.json(
-        { error: "K účtu nie je priradený e-mail." },
-        { status: 400, headers: corsHeaders }
-      );
-    }
+    const adminClient = createClient(supabaseUrl, serviceKey);
 
     const body = await req.json();
     const exhibition_id = body.exhibition_id;
 
     if (!exhibition_id) {
-      return Response.json(
-        { error: "Chýba výstava." },
-        { status: 400, headers: corsHeaders }
-      );
+      throw new Error("Chýba výstava.");
     }
 
-    // Údaje vystavovateľa
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("first_name,last_name")
-      .eq("id", userId)
-      .single();
-
-    // Údaje výstavy
     const { data: exhibition, error: exhibitionError } =
-      await supabase
+      await adminClient
         .from("exhibitions")
-        .select("name,start_date,location")
+        .select("id, name")
         .eq("id", exhibition_id)
         .single();
 
     if (exhibitionError || !exhibition) {
-      return Response.json(
-        { error: "Výstava sa nenašla." },
-        { status: 404, headers: corsHeaders }
-      );
+      throw new Error("Výstava sa nenašla.");
     }
 
-    // Prihlásené zvieratá
+    const { data: animals, error: animalsError } =
+      await adminClient
+        .from("animals")
+        .select("id, category, breed, animal_number")
+        .eq("owner_id", user.id);
+
+    if (animalsError) {
+      throw new Error("Nepodarilo sa načítať zvieratá.");
+    }
+
+    const animalIds = (animals || []).map((a) => a.id);
+
+    if (animalIds.length === 0) {
+      throw new Error("Nemáš pridané žiadne zvieratá.");
+    }
+
     const { data: entries, error: entriesError } =
-      await supabase
+      await adminClient
         .from("entries")
-        .select(`
-          id,
-          animal_id,
-          animals (
-            category,
-            breed,
-            animal_number,
-            owner_id
-          )
-        `)
-        .eq("exhibition_id", exhibition_id);
+        .select("id, animal_id")
+        .eq("exhibition_id", exhibition_id)
+        .in("animal_id", animalIds);
 
     if (entriesError) {
-      return Response.json(
-        { error: entriesError.message },
-        { status: 500, headers: corsHeaders }
-      );
+      throw new Error("Nepodarilo sa načítať prihlásené zvieratá.");
     }
 
-    // Vyberieme iba zvieratá prihlásené daným vystavovateľom
-    const mojePrihlasky = (entries || []).filter((entry: any) =>
-      entry.animals &&
-      entry.animals.owner_id === userId
-    );
-
-    if (!mojePrihlasky.length) {
-      return Response.json(
-        {
-          error: "Na túto výstavu nemáte prihlásené žiadne zvieratá.",
-        },
-        { status: 400, headers: corsHeaders }
-      );
+    if (!entries || entries.length === 0) {
+      throw new Error("Na túto výstavu nemáš prihlásené žiadne zvieratá.");
     }
 
-    // Cena za zviera
-    const { data: settings } = await supabase
+    const { data: settings } = await adminClient
       .from("app_settings")
       .select("entry_fee")
       .eq("id", 1)
-      .single();
+      .maybeSingle();
 
-    const cena = Number(settings?.entry_fee ?? 1);
+    const fee = Number(settings?.entry_fee ?? 1);
+    const total = entries.length * fee;
 
-    if (!Number.isFinite(cena) || cena < 0) {
-      return Response.json(
-        { error: "Nesprávne nastavená cena za zviera." },
-        { status: 500, headers: corsHeaders }
-      );
-    }
+    const animalMap = new Map(
+      (animals || []).map((a) => [a.id, a])
+    );
 
-    const pocet = mojePrihlasky.length;
-    const spolu = pocet * cena;
+    const animalList = entries.map((entry, index) => {
+      const animal = animalMap.get(entry.animal_id);
 
-    const escapeHtml = (value: any) =>
-      String(value ?? "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
+      const category = animal?.category || "Zvieratá";
+      const breed = animal?.breed || "Neuvedené plemeno";
+      const number = animal?.animal_number
+        ? ` – č. ${animal.animal_number}`
+        : "";
 
-    const zoznam = mojePrihlasky.map((entry: any) => {
-      const z = entry.animals;
-
-      return `
-        <li>
-          ${escapeHtml(z.category)} –
-          ${escapeHtml(z.breed)} –
-          číslo: ${escapeHtml(z.animal_number || "—")} –
-          ${cena.toFixed(2)} €
-        </li>
-      `;
+      return `<li>${index + 1}. ${escapeHtml(category)} – ${escapeHtml(breed)}${escapeHtml(number)}</li>`;
     }).join("");
 
-    const meno = [
+    const { data: profile } = await adminClient
+      .from("profiles")
+      .select("first_name, last_name")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    const fullName = [
       profile?.first_name,
       profile?.last_name,
-    ].filter(Boolean).join(" ");
+    ].filter(Boolean).join(" ") || user.email;
 
-    // Obsah potvrdzovacieho e-mailu
     const html = `
-      <div style="font-family:Arial,sans-serif;color:#243328;max-width:600px;margin:auto">
-        <h2>Potvrdenie prihlášky na výstavu</h2>
+      <div style="font-family:Arial,sans-serif;max-width:650px;margin:auto;color:#243328">
+        <h2 style="color:#245b3b">ZO SZCH Koniarovce</h2>
 
-        <p>Dobrý deň ${escapeHtml(meno)},</p>
+        <h3>Potvrdenie prijatia prihlášky</h3>
 
-        <p>
-          Vaša prihláška na výstavu
-          <strong>${escapeHtml(exhibition.name)}</strong>
-          bola úspešne prijatá.
-        </p>
+        <p>Dobrý deň, ${escapeHtml(fullName)},</p>
 
-        <p>
-          <strong>Miesto výstavy:</strong>
-          ${escapeHtml(exhibition.location || "—")}
-        </p>
+        <p>Vaša prihláška na výstavu bola úspešne prijatá.</p>
 
-        <p>
-          <strong>Dátum výstavy:</strong>
-          ${escapeHtml(exhibition.start_date || "—")}
-        </p>
+        <p><strong>Výstava:</strong> ${escapeHtml(exhibition.name)}</p>
 
-        <h3>Zoznam prihlásených zvierat:</h3>
+        <p><strong>Prihlásené zvieratá:</strong></p>
 
-        <ul>${zoznam}</ul>
+        <ul>${animalList}</ul>
 
         <hr>
 
-        <p><strong>Počet zvierat:</strong> ${pocet}</p>
+        <p>Počet zvierat: <strong>${entries.length} ks</strong></p>
+        <p>Poplatok za 1 zviera: <strong>${fee.toFixed(2)} €</strong></p>
 
-        <p><strong>Poplatok za kus:</strong> ${cena.toFixed(2)} €</p>
+        <h3>Celkový poplatok: ${total.toFixed(2)} €</h3>
 
-        <h2>Celkový poplatok: ${spolu.toFixed(2)} €</h2>
-
-        <p>Ďakujeme za Vašu prihlášku.</p>
+        <p>Ďakujeme za Vašu prihlášku a tešíme sa na Vašu účasť.</p>
 
         <p>
           S pozdravom,<br>
@@ -221,59 +164,76 @@ serve(async (req) => {
       </div>
     `;
 
-    // Odoslanie e-mailu cez Resend
-    const resendKey = Deno.env.get("RESEND_API_KEY");
-
-    if (!resendKey) {
-      return Response.json(
-        { error: "Nie je nastavený RESEND_API_KEY." },
-        { status: 500, headers: corsHeaders }
-      );
-    }
-
-    const mail = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${resendKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from: "ZO SZCH Koniarovce <onboarding@resend.dev>",
-        to: [email],
-        subject: `Potvrdenie prihlášky – ${exhibition.name}`,
-        html,
-      }),
-    });
-
-    const mailResult = await mail.json();
-
-    if (!mail.ok) {
-      return Response.json(
-        {
-          error: mailResult.message ||
-            "E-mail sa nepodarilo odoslať.",
-        },
-        { status: 500, headers: corsHeaders }
-      );
-    }
-
-    return Response.json(
+    const resendResponse = await fetch(
+      "https://api.resend.com/emails",
       {
-        success: true,
-        message: "Potvrdenie bolo odoslané na e-mail.",
-        pocetZvierat: pocet,
-        cenaZaKus: cena,
-        celkovyPoplatok: spolu,
-      },
-      { headers: corsHeaders }
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${resendKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from: "ZO SZCH Koniarovce <onboarding@resend.dev>",
+          to: [user.email],
+          subject: `Potvrdenie prihlášky – ${exhibition.name}`,
+          html,
+        }),
+      }
     );
 
-  } catch (error: any) {
-    return Response.json(
+    const resendResult = await resendResponse.json();
+
+    if (!resendResponse.ok) {
+      throw new Error(
+        resendResult.message || "Email sa nepodarilo odoslať."
+      );
+    }
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        message: "Potvrdzovací email bol odoslaný.",
+        count: entries.length,
+        total: total,
+      }),
       {
-        error: error.message || "Nastala neočakávaná chyba.",
-      },
-      { status: 500, headers: corsHeaders }
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+        },
+        status: 200,
+      }
+    );
+
+  } catch (error) {
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error instanceof Error
+          ? error.message
+          : "Nastala chyba.",
+      }),
+      {
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+        },
+        status: 400,
+      }
     );
   }
 });
+
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (char) => {
+    const replacements: Record<string, string> = {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#039;",
+    };
+
+    return replacements[char];
+  });
+}
