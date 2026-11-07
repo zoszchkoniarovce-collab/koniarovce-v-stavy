@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="sk">
 <head>
@@ -665,6 +664,12 @@ async function nacitajVystavy(){
     cancelled.style.fontWeight='bold';
     d.appendChild(cancelled);
    }
+
+   const deleteButton=document.createElement('button');
+   deleteButton.textContent='Natrvalo vymazať výstavu';
+   deleteButton.className='delete';
+   deleteButton.onclick=()=>vymazVystavu(v.id,v.name);
+   d.appendChild(deleteButton);
   }
 
   box.appendChild(d);
@@ -711,6 +716,82 @@ async function zrusVystavu(id,nazov){
 
  sprava('Výstava bola označená ako zrušená.');
  await nacitajVystavy();
+}
+
+/* NATRVALO VYMAZANIE VYSTAVY */
+
+async function vymazVystavu(id,nazov){
+ if(!jeAdmin){
+  sprava('Výstavy môže vymazávať iba administrátor.');
+  return;
+ }
+
+ const potvrdenie=confirm(
+  'POZOR! Naozaj chcete NAVŽDY vymazať výstavu "'+nazov+'"?\n\n'+
+  'Vymažú sa všetky jej prihlášky, hodnotenia a výsledky.\n'+
+  'Zvieratá vystavovateľov zostanú zachované.\n\n'+
+  'Túto akciu nie je možné vrátiť späť.'
+ );
+
+ if(!potvrdenie)return;
+
+ sprava('Načítavam prihlášky výstavy...');
+
+ const {data:entries,error:entriesError}=await db
+ .from('entries')
+ .select('id')
+ .eq('exhibition_id',id);
+
+ if(entriesError){
+  sprava('Nepodarilo sa načítať prihlášky: '+entriesError.message);
+  return;
+ }
+
+ const entryIds=(entries||[]).map(e=>e.id);
+
+ if(entryIds.length){
+  sprava('Odstraňujem hodnotenia...');
+
+  const {error:judgingError}=await db
+   .from('judging')
+   .delete()
+   .in('entry_id',entryIds);
+
+  if(judgingError){
+   sprava('Hodnotenia sa nepodarilo vymazať: '+judgingError.message);
+   return;
+  }
+
+  sprava('Odstraňujem prihlášky...');
+
+  const {error:deleteEntriesError}=await db
+   .from('entries')
+   .delete()
+   .eq('exhibition_id',id);
+
+  if(deleteEntriesError){
+   sprava('Prihlášky sa nepodarilo vymazať: '+deleteEntriesError.message);
+   return;
+  }
+ }
+
+ sprava('Odstraňujem výstavu...');
+
+ const {error:deleteExhibitionError}=await db
+  .from('exhibitions')
+  .delete()
+  .eq('id',id);
+
+ if(deleteExhibitionError){
+  sprava('Výstavu sa nepodarilo vymazať: '+deleteExhibitionError.message);
+  return;
+ }
+
+ sprava('Výstava „'+nazov+'“ bola natrvalo vymazaná.');
+
+ await nacitajVystavy();
+ await nacitajVsetkyPrihlasky();
+ await nacitajVerejneVysledky();
 }
 
 async function vytvorVystavu(){
